@@ -1,8 +1,5 @@
 package com.identityblitz.jwt
 
-/**
- *
- */
-object JwsToolkit {
+object JwsToolkit extends JwtToolkit {
 
 }

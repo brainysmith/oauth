@@ -3,9 +3,6 @@ package com.identityblitz.json
 
 import org.scalatest.{Matchers, FlatSpec}
 
-/**
- *
- */
 class JsonTest extends FlatSpec with Matchers  {
 
   behavior of "Checking of JSON serialization"

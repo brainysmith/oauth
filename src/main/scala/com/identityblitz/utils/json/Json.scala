@@ -13,6 +13,8 @@ object Json {
 
   case class JValWrapperImpl(value: JVal) extends JValWrapper
 
+  implicit val implicitConv = scala.language.implicitConversions
+
   implicit def jval2JValWrapper[T](value: T)(implicit writer: JWriter[T]) = JValWrapperImpl(writer.write(value))
 
   def obj(fields: (String, JValWrapper)*): JObj = JObj(fields.map(e => (e._1, e._2.asInstanceOf[JValWrapperImpl].value)))

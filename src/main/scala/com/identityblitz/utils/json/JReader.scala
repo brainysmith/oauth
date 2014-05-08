@@ -4,9 +4,6 @@ import scala.annotation.implicitNotFound
 import scala.reflect.ClassTag
 import scala.collection.generic.CanBuildFrom
 
-/**
- *
- */
 @implicitNotFound("No JSON reader found for type ${T}. Try to implement an implicit JReader.")
 trait JReader[T] {
 
@@ -49,6 +46,8 @@ trait DefaultJReaders {
   implicit object JValReader extends JReader[JVal] {
     def read(v: JVal): JResult[JVal] = JSuccess(v)
   }
+
+  implicit val higherKinded = scala.language.higherKinds
 
   implicit def traversableJReader[I[_], A](implicit cb: CanBuildFrom[I[_], A, I[A]], jr: JReader[A]) = new JReader[I[A]] {
     def read(v: JVal): JResult[I[A]] = {
