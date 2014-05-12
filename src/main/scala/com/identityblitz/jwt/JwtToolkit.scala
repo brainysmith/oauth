@@ -2,30 +2,29 @@ package com.identityblitz.jwt
 
 import org.joda.time.DateTime
 import java.net.URI
+import scala.collection.mutable
+import com.identityblitz.utils.json.{JVal, Json, JObj}
+import org.apache.commons.codec.binary.Base64
 
 /**
  * The JSON Web Token (JWT) toolkit is to work with JWT token. The current implementation is based on
  * the JSON Web Token (JWT) draft of version 20 (http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-20).
  */
-trait JwtToolkit {
 
+trait JwtTools {
   object AlgorithmType extends Enumeration {
     type AlgorithmType = Value
     val SIGNING, ENCRYPTION = Value
   }
-  import AlgorithmType._
 
   /**
    * This trait represents algorithm being used to encrypt or sign an JWT.
    */
-  sealed class Algorithm(val name: String, val algType: AlgorithmType, ds: (String) => JWT[_, _])
 
-  trait AlgorithmsKit
+  trait Algorithm {
 
-  implicit object AlgorithmsKit extends AlgorithmsKit {
-    case object none extends Algorithm("none", SIGNING, s => {
-      new PlainJWT(new PlainJWS())
-    })
+    def apply(header: JObj, token: String): JWT[JWS, JWE]
+
   }
 
   /**
@@ -46,8 +45,6 @@ trait JwtToolkit {
     val cty: Option[String]
 
     def serialize(cs: ClaimsSet): String
-    
-    def deserialize(strJWT: String): JWT[_, _]
 
   }
 
@@ -57,7 +54,7 @@ trait JwtToolkit {
 
   trait ClaimsSet
 
-  trait JWT[S <: JWS, E <: JWE] {
+  trait JWT[+S <: JWS, +E <: JWE] {
 
     val asJWS: Option[S]
 
@@ -68,18 +65,47 @@ trait JwtToolkit {
     def serialize: String
 
   }
+}
 
-  sealed class PlainJWS() extends JWS {
-    val alg: Algorithm = AlgorithmsKit.none
-    val typ: Option[String] = None
-    val cty: Option[String] = None
+abstract class AlgorithmsKit extends JwtTools {
+  thisKit =>
+
+  import AlgorithmType._
+
+  private val aMap: mutable.Map[String, Algorithm] = new mutable.HashMap
+
+  def byName(name: String) = aMap(name)
+
+  protected def Algorithm[S <: JWS, E <: JWE](name: String,
+                                              algType: AlgorithmType,
+                                              ds: (JObj, String) => JWT[S, E]): Algorithm =
+    new AlgorithmItem(name, algType, ds)
+
+  protected class AlgorithmItem[+S <: JWS, +E <: JWE](val name: String,
+                                                    val algType: AlgorithmType,
+                                                    val ds: (JObj, String) => JWT[S, E]) extends Algorithm {
+    thisKit.aMap(name) = this
+
+    def apply(header: JObj, token: String): JWT[JWS, JWE] = ds(header, token)
+  }
+}
+
+trait JwtToolkit extends AlgorithmsKit with JwtTools {
+  self =>
+
+  val none = Algorithm("none", AlgorithmType.SIGNING, (hdr, tkn) => {
+    new JWTImpl(new JWSNone(hdr))
+  })
+
+  private sealed class JWSNone(private val values: JObj) extends JWS {
+    val alg: Algorithm = none
+    val typ: Option[String] = values("typ").asOpt[String]
+    val cty: Option[String] = values("cty").asOpt[String]
 
     def serialize(cs: ClaimsSet): String = ???
-
-    def deserialize(strJWT: String): JWT[_, _] = ???
   }
 
-  sealed class PlainJWT(private val header: JWS) extends JWT[JWS, JWE]{
+  protected sealed class JWTImpl(private val header: JWS) extends JWT[JWS, JWE]{
 
     val asJWS: Option[JWS] = Option(header)
 
@@ -93,7 +119,10 @@ trait JwtToolkit {
 
   object JWT {
 
-    def apply(strJWT: String)(implicit algKit: AlgorithmsKit): JWT[JWS, JWE] = ???
+    def apply(strJWT: String): JWT[JWS, JWE] = {
+      val header = JVal.parseStr(new String(Base64.decodeBase64(strJWT.takeWhile(_ != '.')), "UTF-8")).as[JObj]
+      self.byName(header("alg").as[String])(header, strJWT)
+    }
 
   }
 

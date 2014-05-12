@@ -1,4 +1,4 @@
-package com.identityblitz.json
+package com.identityblitz.utils.json
 
 import scala.annotation.implicitNotFound
 import scala.reflect.ClassTag
@@ -45,6 +45,34 @@ trait DefaultJReaders {
 
   implicit object JValReader extends JReader[JVal] {
     def read(v: JVal): JResult[JVal] = JSuccess(v)
+  }
+
+  implicit object JNumReader extends JReader[JNum] {
+    def read(v: JVal): JResult[JNum] = v match {
+      case o: JNum => JSuccess(o)
+      case _ => JError(("json.error.expected.number"))
+    }
+  }
+
+  implicit object JStrReader extends JReader[JStr] {
+    def read(v: JVal): JResult[JStr] = v match {
+      case o: JStr => JSuccess(o)
+      case _ => JError(("json.error.expected.string"))
+    }
+  }
+
+  implicit object JBoolReader extends JReader[JBool] {
+    def read(v: JVal): JResult[JBool] = v match {
+      case o: JBool => JSuccess(o)
+      case _ => JError(("json.error.expected.boolean"))
+    }
+  }
+
+  implicit object JObjReader extends JReader[JObj] {
+    def read(v: JVal): JResult[JObj] = v match {
+      case o: JObj => JSuccess(o)
+      case _ => JError(("json.error.expected.object"))
+    }
   }
 
   implicit val higherKinded = scala.language.higherKinds

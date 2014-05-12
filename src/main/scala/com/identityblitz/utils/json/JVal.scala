@@ -1,4 +1,4 @@
-package com.identityblitz.json
+package com.identityblitz.utils.json
 
 import org.codehaus.jackson.map._
 import org.codehaus.jackson.`type`.JavaType

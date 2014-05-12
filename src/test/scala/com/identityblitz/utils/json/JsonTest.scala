@@ -1,4 +1,4 @@
-package com.identityblitz.json
+package com.identityblitz.utils.json
 
 
 import org.scalatest.{Matchers, FlatSpec}

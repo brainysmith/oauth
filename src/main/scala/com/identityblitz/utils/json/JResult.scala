@@ -1,4 +1,4 @@
-package com.identityblitz.json
+package com.identityblitz.utils.json
 
 import scala.Predef._
 import java.util.NoSuchElementException
