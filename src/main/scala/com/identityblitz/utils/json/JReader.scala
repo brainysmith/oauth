@@ -96,6 +96,10 @@ trait DefaultJReaders {
             JError(errors.map{case Left(e) => e}.toSeq)
           }
         }
+        case s: JVal => jr.read(s) match {
+          case JSuccess(j) => JSuccess((cb() += j).result())
+          case JError(er) => JError(er)
+        }
         case _ => JError("json.error.expected.array")
       }
     }
