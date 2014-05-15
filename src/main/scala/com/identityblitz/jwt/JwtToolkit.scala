@@ -6,6 +6,7 @@ import scala.collection.mutable
 import com.identityblitz.utils.json._
 import org.apache.commons.codec.binary.Base64
 import com.identityblitz.utils.json.JSuccess
+import org.apache.commons.lang.StringUtils
 
 /**
  * The JSON Web Token (JWT) toolkit is to work with JWT token. The current implementation is based on
@@ -18,7 +19,7 @@ import com.identityblitz.utils.json.JSuccess
  */
 sealed case class IntDate(value: Int) {
 
-  if (value < 0) throw new IllegalArgumentException("The number of second from epoch must be non negative.")
+  if (value <= 0) throw new IllegalArgumentException("The number of second from epoch must be non negative.")
 
   def before(d: IntDate): Boolean = d.value < value
 
@@ -29,11 +30,15 @@ sealed case class IntDate(value: Int) {
 
 object IntDate {
 
-  implicit object JStrReader extends JReader[IntDate] {
+  implicit object JIntDateReader extends JReader[IntDate] {
     def read(v: JVal): JResult[IntDate] = v match {
       case o: JNum => JSuccess(IntDate(o.as[Int]))
       case _ => JError("json.error.expected.number")
     }
+  }
+
+  implicit object JIntDateWriter extends JWriter[IntDate] {
+    def write(o: IntDate): JVal = JNum(o.value)
   }
 
   def now: IntDate = IntDate((new DateTime().getMillis / 1000).toInt)
@@ -53,13 +58,21 @@ sealed trait StringOrUri {
 
 object StringOrUri {
 
-  def apply(str: String) = if(str.indexOf(':') == -1) new StringVersion(str) else new UriVersion(new URI(str))
+  def apply(str: String) = {
+    if(StringUtils.isBlank(str))
+      throw new IllegalArgumentException("StringOrUri can not be blank.")
+    if(str.indexOf(':') == -1) new StringVersion(str) else new UriVersion(new URI(str))
+  }
 
-  implicit object JStrReader extends JReader[StringOrUri] {
+  implicit object JStringOrUriReader extends JReader[StringOrUri] {
     def read(v: JVal): JResult[StringOrUri] = v match {
       case o: JStr => JSuccess(StringOrUri(o))
       case _ => JError("json.error.expected.string")
     }
+  }
+
+  implicit object JStringOrUriDateWriter extends JWriter[StringOrUri] {
+    def write(o: StringOrUri): JVal = JStr(o.toString)
   }
 
 }
@@ -117,6 +130,68 @@ trait JwtTools {
   }
 
   /**
+   * Description of a registered or predefined header parameter or claim.
+   */
+  trait Name[A] {
+    val name: String
+    val validator: (A) => Unit
+    def % (a: A): (String, JVal)
+  }
+
+  abstract class NameKit {
+
+    def Name[A](name: String, validator: (A) => Unit)(implicit writer: JWriter[A]): Name[A] = new NameImpl[A](name, validator)
+
+    private class NameImpl[A](val name: String, val validator: (A) => Unit)(implicit writer: JWriter[A]) extends Name[A] {
+      def % (a: A): (String, JVal) = {
+        validator(a)
+        (name, Json.toJson(a))
+      }
+    }
+
+  }
+
+  trait BaseNameKit extends NameKit {
+
+    val checkIfBlank = (s: String) => {
+      if(StringUtils.isBlank(s))
+        throw new IllegalArgumentException("typ parameter is blank")
+    }
+
+    /**
+     * Common header parameters
+     */
+    val typ = Name[String]("typ", checkIfBlank)
+    val cty = Name[String]("cty", checkIfBlank)
+
+    /**
+     * Registered claims
+     */
+    val iss = Name[StringOrUri]("iss", (v) => {})
+    val sub = Name[StringOrUri]("sub", (v) => {})
+    val aud = Name[Array[StringOrUri]]("aud", (v) => {
+      if(v.isEmpty)
+        throw new IllegalArgumentException("Audience list is empty")})
+    val exp = Name[IntDate]("exp", (v) => {})
+    val nbf = Name[IntDate]("nbf", (v) => {})
+    val iat = Name[IntDate]("iat", (v) => {})
+    val jti = Name[String]("typ", checkIfBlank)
+
+  }
+
+  object BaseNameKit extends BaseNameKit
+
+  implicit def JsonPairConverter(name: String): JsonPairConverter = new JsonPairConverter(name)
+
+  class JsonPairConverter(name: String) {
+    def % (value: String): (String, JVal) = (name, JStr(value))
+    def % (value: StringOrUri): (String, JVal) = (name, JStr(value.toString))
+    def % (value: Int): (String, JVal) = (name, JNum(value))
+    def % (value: IntDate): (String, JVal) = (name, JNum(value.value))
+    def % (value: Boolean): (String, JVal) = (name, JBool(value))
+  }
+
+  /**
    * This trait represents general header of a JWT token.
    */
   trait Header {
@@ -130,7 +205,7 @@ trait JwtTools {
 
     def names:Set[String]
 
-    def asJson: JObj
+    def asBase64: String
 
   }
 
@@ -138,15 +213,17 @@ trait JwtTools {
    * This traits is represents JWS header.
    */
   class JWS(val alg: Algorithm, values: JObj) extends Header {
-    val typ: Option[String] = values("typ").asOpt[String]
-    val cty: Option[String] = values("cty").asOpt[String]
+    val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
+    val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
     def apply(name: String): JVal = values(name)
     def get(name: String): Option[JVal] = values(name).asOpt[JVal]
 
     def names:Set[String] = values.fields
 
-    def asJson: JObj = ???
+    def asBase64: String = utf8StringToBase64((values + ("alg" -> alg.toString)).toJson)
+
+    override def toString: String = (values + ("alg" -> alg.toString)).toString
   }
 
   /**
@@ -156,18 +233,22 @@ trait JwtTools {
 
   class ClaimsSet(val values: JObj) {
 
-    val iss: Option[StringOrUri] = values("iss").asOpt[StringOrUri]
-    val sub: Option[StringOrUri] = values("sub").asOpt[StringOrUri]
-    val aud: Option[Seq[StringOrUri]] = values("aud").asOpt[Seq[StringOrUri]]
-    val exp: Option[IntDate] = values("exp").asOpt[IntDate]
-    val iat: Option[IntDate] = values("iat").asOpt[IntDate]
-    val jti: Option[String] = values("jti").asOpt[String]
+    val iss: Option[StringOrUri] = values(BaseNameKit.iss.name).asOpt[StringOrUri]
+    val sub: Option[StringOrUri] = values(BaseNameKit.sub.name).asOpt[StringOrUri]
+    val aud: Option[Seq[StringOrUri]] = values(BaseNameKit.aud.name).asOpt[Seq[StringOrUri]]
+    val exp: Option[IntDate] = values(BaseNameKit.exp.name).asOpt[IntDate]
+    val nbf: Option[IntDate] = values(BaseNameKit.nbf.name).asOpt[IntDate]
+    val iat: Option[IntDate] = values(BaseNameKit.iat.name).asOpt[IntDate]
+    val jti: Option[String] = values(BaseNameKit.jti.name).asOpt[String]
 
     def apply(name: String): JVal = values.apply(name)
     def get(name: String): Option[JVal] = values.asOpt[JVal]
 
     def names:Set[String] = values.fields
 
+    def asBase64: String = utf8StringToBase64(values.toJson)
+
+    override def toString: String = values.toString
   }
 
   /**
@@ -183,44 +264,50 @@ trait JwtTools {
 
     val claimSet: ClaimsSet
 
-    def asJson: JObj
+    def asBase64: String
   }
 
-  def base64ToUtf8String(base64: String) = new String(Base64.decodeBase64(base64), "UTF-8")
+  protected sealed class JWTBase(private val header: JWS, cs: JObj) extends JWT[JWS, JWE]{
+
+    val asJWS: Option[JWS] = Option(header)
+
+    val asJWE: Option[JWE] = None
+
+    val claimSet: ClaimsSet = new ClaimsSet(cs)
+
+    def asBase64: String = header.alg.apply(this)
+
+    override def toString: String = header.toString + "." + cs.toString
+
+  }
 
   /**
    * Builder types.
    */
 
-  sealed class HdrParam(val name: String, val value: JVal)
-
-  class StringHdrParamMapper(name: String) {
-    def -> (value: String): HdrParam = new HdrParam(name, JStr(value))
-    def -> (value: StringOrUri): HdrParam = new HdrParam(name, JStr(value.toString))
-    def -> (value: Int): HdrParam = new HdrParam(name, JNum(value))
-    def -> (value: IntDate): HdrParam = new HdrParam(name, JNum(value.value))
-  }
-
-  sealed class Claim(val name: String, val value: JVal)
-
-  class StringClaimMapper(name: String) {
-    def -> (value: String): Claim = new Claim(name, JStr(value))
-    def -> (value: StringOrUri): Claim = new Claim(name, JStr(value.toString))
-    def -> (value: Int): Claim = new Claim(name, JNum(value))
-    def -> (value: IntDate): Claim = new Claim(name, JNum(value.value))
-  }
+  implicit val impl = scala.language.implicitConversions
+  implicit val reflective = scala.language.reflectiveCalls
+  implicit val postfix = scala.language.postfixOps
 
   def builder = new {
     def alg(a: Algorithm) = new {
       val _alg = a
-      def header(hs: HdrParam*) = new {
-        val header = JObj(hs.map(h => (h.name, h.value)))
-        def cs(s: Claim*) = new {
-          def build:JWT[JWS, JWE] = a.apply(header, JObj(s.map(c => (c.name, c.value))))
+      def header(hs: (String, JVal)*) = new {
+        val header = JObj(hs)
+        def cs(s: (String, JVal)*) = new {
+          def build:JWT[JWS, JWE] = a(header, JObj(s))
         }
       }
     }
   }
+
+  /**
+   * Arbitrary tools
+   */
+
+  def base64ToUtf8String(base64: String) = new String(Base64.decodeBase64(base64), "UTF-8")
+
+  def utf8StringToBase64(str: String) = Base64.encodeBase64URLSafeString(str.getBytes("UTF-8"))
 
 }
 
@@ -276,7 +363,9 @@ abstract class AlgorithmsKit extends JwtTools {
 
     def apply(jwt: JWT[JWS, JWE]): String = sz(jwt)
 
-    def apply(header: JObj, cs: JObj): JWT[JWS, JWE] = ???
+    def apply(header: JObj, cs: JObj): JWT[JWS, JWE] = new JWTBase(new JWS(this, header), cs)
+
+    override def toString: String = name
   }
 
 }
@@ -290,26 +379,16 @@ trait JwtToolkit extends AlgorithmsKit with JwtTools {
     (hdr, tkn) => {
       if(!tkn.endsWith("."))
         throw new IllegalStateException("token has wrong format")
-
       tkn.split("\\.").toList match {
         case _ :: cs :: Nil =>
-          new JWTImpl(new JWSNone(hdr), JVal.parseStr(base64ToUtf8String(cs)).as[JObj])
+          new JWTBase(new JWSNone(hdr), JVal.parseStr(base64ToUtf8String(cs)).as[JObj])
         case _ => throw new IllegalStateException("token has wrong format")
       }},
-    j => null)
+    j => {
+      j.asJWS.get.asBase64 + "." + j.claimSet.asBase64 + "."
+    })
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)
-
-  protected sealed class JWTImpl(private val header: JWS, cs: JObj) extends JWT[JWS, JWE]{
-
-    val asJWS: Option[JWS] = Option(header)
-
-    val asJWE: Option[JWE] = None
-
-    val claimSet: ClaimsSet = new ClaimsSet(cs)
-
-    def asJson: JObj = ???
-  }
 
   object JWT {
 

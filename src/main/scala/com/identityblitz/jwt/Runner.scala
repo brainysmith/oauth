@@ -15,31 +15,17 @@ object Runner {
     System.out.println(jwt.claimSet.exp.get)
     System.out.println(jwt.claimSet.names)
 
-    /*class JwtBuilder(set: Seq[Claim])
+    import BaseNameKit._
 
-    def cs(s: Claim*): JwtBuilder = new JwtBuilder(s)
+    val jwt2 = builder alg none header (
+      typ % "JWT"
+      ) cs (
+      iss % StringOrUri("joe"),
+      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3"))
+      ) build
 
-    trait Claim
-
-    class StringMapper(name: String) {
-      def -> (value: String): Claim = ???
-      def -> (value: StringOrUri): Claim = ???
-      def -> (value: Int): Claim = ???
-      def -> (value: IntDate): Claim = ???
-    }
-
-    class JwtBuilder2[A] {
-      def header():A = ???
-    }
-
-    implicit def alg2Header[A <: Algorithm](a: A) = new JwtBuilder2[A]
-
-    implicit def string2Claim(x: String): StringMapper = new StringMapper(x)
-
-    none header () cs ("" -> "",
-      "" -> 1,
-      "" -> StringOrUri(""),
-      "" -> new IntDate(7))*/
+    System.out.println(jwt2)
+    System.out.println(jwt2 asBase64)
 
   }
 

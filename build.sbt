@@ -28,6 +28,7 @@ libraryDependencies ++= Seq(
   "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.10",
   "joda-time" % "joda-time" % "2.3",
   "org.joda" % "joda-convert" % "1.6",
+  "commons-lang" % "commons-lang" % "2.6",
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test"
 )
@@ -38,5 +39,5 @@ scalacOptions ++= List("-feature","-deprecation", "-unchecked")
 
 //Style Check section 
 //org.scalastyle.sbt.ScalastylePlugin.Settings
- 
+
 //org.scalastyle.sbt.PluginKeys.config <<= baseDirectory { _ / "src/main/config" / "scalastyle-config.xml" }

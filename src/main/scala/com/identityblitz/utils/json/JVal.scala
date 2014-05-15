@@ -60,23 +60,33 @@ object JVal {
   def parseStr(str: String): JVal = JacksonBridge.jsonString2JVal(str)
 }
 
-case object JUndef extends JVal
+case object JUndef extends JVal {
+  override def toString: String = "JUndef"
+}
 
-case object JNull extends JVal
+case object JNull extends JVal {
+  override def toString: String = "JNull"
+}
 
-case class JNum(private val value: BigDecimal) extends JVal
+case class JNum(private val value: BigDecimal) extends JVal {
+  override def toString: String = "JNum(" + value + ")"
+}
 
 object JNum {
   implicit def bigDecimalConverter(j: JNum): BigDecimal = j.value
 }
 
-case class JStr(private val value: String) extends JVal
+case class JStr(private val value: String) extends JVal {
+  override def toString: String = "JStr(" + value + ")"
+}
 
 object JStr {
   implicit def stringConverter(j: JStr): String = j.value
 }
 
-case class JBool(private val value: Boolean) extends JVal
+case class JBool(private val value: Boolean) extends JVal {
+  override def toString: String = "JBool(" + value + ")"
+}
 
 object JBool {
   implicit def booleanConverter(j: JBool): Boolean = j.value
@@ -137,6 +147,7 @@ case class JObj(private val v: Seq[(String, JVal)]) extends JVal {
 
   override def \(field: String) = value.get(field).getOrElse(JUndef)
 
+  override def toString: String = value.map(e => "\"" + e._1 + "\":" + e._2).mkString("JObj(", ",", ")")
 }
 
 object JObj {
