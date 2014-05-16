@@ -1,12 +1,13 @@
 package com.identityblitz.jwt
 
 import java.lang.System
-import com.identityblitz.utils.json.JObj
+
+object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit
 
 object Runner {
 
   def main(args: Array[String]) {
-    import JwsToolkit._
+    import BaseJwtToolkit._
 
     val plainJwt = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
 
@@ -19,9 +20,6 @@ object Runner {
     System.out.println(jwt.claimSet.exp.get)
     System.out.println(jwt.claimSet.names)
 
-    /*val jws = builder.alg(none).apply(JObj(), JObj())
-    val jwsh: JWS = jws.header*/
-
     import BaseNameKit._
 
     val jwt2 = builder alg none header (
@@ -33,8 +31,16 @@ object Runner {
 
     val jwsh: JWS = jwt2.header
 
+    val myJwt = builder
+    .alg(none)
+    .header (typ % "JWT",
+             "http://mydomain.com/type" % "idToken")
+    .cs (iss % StringOrUri("john"),
+         "http://mydomain.com/trusted" % true)
+    .build
+
     System.out.println(jwt2)
-    System.out.println(jwt2 asBase64)
+    System.out.println(myJwt asBase64)
 
   }
 
