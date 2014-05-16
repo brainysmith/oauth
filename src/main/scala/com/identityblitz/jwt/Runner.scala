@@ -1,6 +1,7 @@
 package com.identityblitz.jwt
 
 import java.lang.System
+import com.identityblitz.utils.json.JObj
 
 object Runner {
 
@@ -11,9 +12,15 @@ object Runner {
 
     val jwt = JWT(plainJwt)
 
+    System.out.println(jwt.header.alg.name)
+    System.out.println(jwt.header.typ)
+
     System.out.println(jwt.claimSet.iss.get)
     System.out.println(jwt.claimSet.exp.get)
     System.out.println(jwt.claimSet.names)
+
+    /*val jws = builder.alg(none).apply(JObj(), JObj())
+    val jwsh: JWS = jws.header*/
 
     import BaseNameKit._
 
@@ -23,6 +30,8 @@ object Runner {
       iss % StringOrUri("joe"),
       aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3"))
       ) build
+
+    val jwsh: JWS = jwt2.header
 
     System.out.println(jwt2)
     System.out.println(jwt2 asBase64)

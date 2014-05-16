@@ -106,7 +106,9 @@ trait JwtTools {
   /**
    * This trait represents algorithm being used to encrypt or sign an JWT.
    */
-  trait Algorithm {
+  trait Algorithm[H <: Header[H]] {
+
+    val name: String
 
     val typ: AlgorithmType.Value
 
@@ -116,16 +118,16 @@ trait JwtTools {
      * @param token - string representation of the token
      * @return - JWT instance
      */
-    def apply(header: JObj, token: String): JWT[JWS, JWE]
+    def apply(header: JObj, token: String): JWT[H]
 
     /**
      * Serializes an jwt instance into its string representation.
      * @param jwt - JWT instance
      * @return - string representation of the token
      */
-    def apply(jwt :JWT[JWS, JWE]): String
+    def apply(jwt :JWT[H]): String
 
-    def apply(header: JObj, cs: JObj): JWT[JWS, JWE]
+    def apply(header: JObj, cs: JObj): JWT[H]
 
   }
 
@@ -171,7 +173,8 @@ trait JwtTools {
     val sub = Name[StringOrUri]("sub", (v) => {})
     val aud = Name[Array[StringOrUri]]("aud", (v) => {
       if(v.isEmpty)
-        throw new IllegalArgumentException("Audience list is empty")})
+        throw new IllegalArgumentException("Audience list is empty")
+    })
     val exp = Name[IntDate]("exp", (v) => {})
     val nbf = Name[IntDate]("nbf", (v) => {})
     val iat = Name[IntDate]("iat", (v) => {})
@@ -194,9 +197,9 @@ trait JwtTools {
   /**
    * This trait represents general header of a JWT token.
    */
-  trait Header {
+  trait Header[H <: Header[H]] {
 
-    val alg: Algorithm
+    val alg: Algorithm[H]
     val typ: Option[String]
     val cty: Option[String]
 
@@ -212,7 +215,7 @@ trait JwtTools {
   /**
    * This traits is represents JWS header.
    */
-  class JWS(val alg: Algorithm, values: JObj) extends Header {
+  class JWS(val alg: Algorithm[JWS], values: JObj) extends Header[JWS] {
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
@@ -229,7 +232,7 @@ trait JwtTools {
   /**
    * This traits is represents JWS header.
    */
-  trait JWE extends Header
+  trait JWE extends Header[JWE]
 
   class ClaimsSet(val values: JObj) {
 
@@ -253,25 +256,18 @@ trait JwtTools {
 
   /**
    * Represents JSON Web token instance.
-   * @tparam S - type of JWS header
-   * @tparam E - type of JWE header
+   * @tparam H - type of the header
    */
-  trait JWT[+S <: JWS, +E <: JWE] {
+  trait JWT[H <: Header[H]] {
 
-    val asJWS: Option[S]
-
-    val asJWE: Option[E]
+    val header: H
 
     val claimSet: ClaimsSet
 
     def asBase64: String
   }
 
-  protected sealed class JWTBase(private val header: JWS, cs: JObj) extends JWT[JWS, JWE]{
-
-    val asJWS: Option[JWS] = Option(header)
-
-    val asJWE: Option[JWE] = None
+  protected sealed class JWTBase[H <: Header[H]](val header: H, cs: JObj) extends JWT[H] {
 
     val claimSet: ClaimsSet = new ClaimsSet(cs)
 
@@ -290,12 +286,12 @@ trait JwtTools {
   implicit val postfix = scala.language.postfixOps
 
   def builder = new {
-    def alg(a: Algorithm) = new {
+    def alg[H <: Header[H]](a: Algorithm[H]) = new {
       val _alg = a
       def header(hs: (String, JVal)*) = new {
         val header = JObj(hs)
         def cs(s: (String, JVal)*) = new {
-          def build:JWT[JWS, JWE] = a(header, JObj(s))
+          def build = a.apply(header, JObj(s))
         }
       }
     }
@@ -319,7 +315,7 @@ abstract class AlgorithmsKit extends JwtTools {
 
   import AlgorithmType._
 
-  private val aMap: mutable.Map[String, Algorithm] = new mutable.HashMap
+  private val aMap: mutable.Map[String, Algorithm[_ <: Header[_]]] = new mutable.HashMap
 
   /**
    * Returns an algorithm by its name. If there is no algorithm associated with the key null is returned.
@@ -343,27 +339,28 @@ abstract class AlgorithmsKit extends JwtTools {
    * @param ds - function to deserialize an JWT token from its string representation. Also it must do all necessary
    *           validations such as MAC validation, structure validation and so on.
    * @param sz - function to serialize an JWT token to its string representation.
-   * @tparam S - type of JWS header.
-   * @tparam E - type of JWE header.
+   * @tparam H - type of the header.
    * @return - newly created algorithm.
    */
-  protected def Algorithm[S <: JWS, E <: JWE](name: String,
-                                              algType: AlgorithmType,
-                                              ds: (JObj, String) => JWT[S, E],
-                                              sz: (JWT[JWS, JWE]) => String): Algorithm =
-    new AlgorithmItem(name, algType, ds, sz)
+  protected def Algorithm[H <: Header[H]](name: String,
+                                          algType: AlgorithmType,
+                                          ds: (JObj, String) => JWT[H],
+                                          sz: (JWT[H]) => String,
+                                          mkh: (JObj) => H): Algorithm[H] =
+    new AlgorithmItem[H](name, algType, ds, sz, mkh)
 
-  private class AlgorithmItem[+S <: JWS, +E <: JWE](val name: String,
-                                                    val typ: AlgorithmType,
-                                                    val ds: (JObj, String) => JWT[S, E],
-                                                    val sz: (JWT[JWS, JWE]) => String) extends Algorithm {
+  private class AlgorithmItem[H <: Header[H]](val name: String,
+                                              val typ: AlgorithmType,
+                                              val ds: (JObj, String) => JWT[H],
+                                              val sz: (JWT[H]) => String,
+                                              val mkh: (JObj) => H) extends Algorithm[H] {
     thisKit.aMap(name) = this
 
-    def apply(header: JObj, token: String): JWT[JWS, JWE] = ds(header, token)
+    def apply(header: JObj, token: String): JWT[H] = ds(header, token)
 
-    def apply(jwt: JWT[JWS, JWE]): String = sz(jwt)
+    def apply(jwt: JWT[H]): String = sz(jwt)
 
-    def apply(header: JObj, cs: JObj): JWT[JWS, JWE] = new JWTBase(new JWS(this, header), cs)
+    def apply(header: JObj, cs: JObj): JWT[H] = new JWTBase[H](mkh(header), cs)
 
     override def toString: String = name
   }
@@ -375,26 +372,28 @@ trait JwtToolkit extends AlgorithmsKit with JwtTools {
 
   import AlgorithmType._
 
-  val none = Algorithm("none", SIGNING,
+  val none = Algorithm[JWS]("none", SIGNING,
     (hdr, tkn) => {
       if(!tkn.endsWith("."))
         throw new IllegalStateException("token has wrong format")
       tkn.split("\\.").toList match {
         case _ :: cs :: Nil =>
-          new JWTBase(new JWSNone(hdr), JVal.parseStr(base64ToUtf8String(cs)).as[JObj])
+          new JWTBase[JWS](new JWSNone(hdr), JVal.parseStr(base64ToUtf8String(cs)).as[JObj])
         case _ => throw new IllegalStateException("token has wrong format")
       }},
     j => {
-      j.asJWS.get.asBase64 + "." + j.claimSet.asBase64 + "."
-    })
+      j.header.asBase64 + "." + j.claimSet.asBase64 + "."
+    },
+    new JWSNone(_)
+  )
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)
 
   object JWT {
 
-    def apply(strJWT: String): JWT[JWS, JWE] = {
+    def apply(strJWT: String): JWT[_ <: Header[_]] = {
       val header = JVal.parseStr(base64ToUtf8String(strJWT.takeWhile(_ != '.'))).as[JObj]
-      header("alg").asOpt[String].map(n => self.optByName(n).map(_(header, strJWT))
+      header("alg").asOpt[String].map(n => self.optByName(n).map(a => a.apply(header, strJWT))
         .orElse(throw new IllegalStateException("unknown algorithm ["+ n +"]")))
         .orElse(throw new IllegalStateException("not found mandatory header parameter [alg]")).get.get
     }
