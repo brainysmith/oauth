@@ -22,25 +22,16 @@ object Runner {
 
     import BaseNameKit._
 
-    val jwt2 = builder alg none header (
-      typ % "JWT"
-      ) cs (
+    val jwt2 = builder
+      .alg(none)
+      .header (typ % "JWT")
+      .cs (
       iss % StringOrUri("joe"),
-      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3"))
-      ) build
-
-    val jwsh: JWS = jwt2.header
-
-    val myJwt = builder
-    .alg(none)
-    .header (typ % "JWT",
-             "http://mydomain.com/type" % "idToken")
-    .cs (iss % StringOrUri("john"),
-         "http://mydomain.com/trusted" % true)
-    .build
+      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3")))
+      .build
 
     System.out.println(jwt2)
-    System.out.println(myJwt asBase64)
+    System.out.println(jwt2 asBase64)
 
   }
 

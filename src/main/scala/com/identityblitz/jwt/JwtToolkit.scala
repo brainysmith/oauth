@@ -73,30 +73,32 @@ trait JwtToolkit {
    */
   trait BaseNameKit extends NameKit {
 
-    val checkIfBlank = (s: String) => {
-      if(StringUtils.isBlank(s))
-        throw new IllegalArgumentException("typ parameter is blank")
+    def checkIfBlank(name: String)(value: String) = {
+      if(StringUtils.isBlank(value))
+        throw new IllegalArgumentException(name + " parameter is blank")
+    }
+
+    def checkIfEmptyArray(name: String)(value: Array[_]) = {
+      if(value.isEmpty)
+        throw new IllegalArgumentException(value + " list is empty")
     }
 
     /**
      * Common header parameters
      */
-    val typ = Name[String]("typ", checkIfBlank)
-    val cty = Name[String]("cty", checkIfBlank)
+    val typ = Name[String]("typ", checkIfBlank("typ"))
+    val cty = Name[String]("cty", checkIfBlank("cty"))
 
     /**
      * Registered claims
      */
     val iss = Name[StringOrUri]("iss", (v) => {})
     val sub = Name[StringOrUri]("sub", (v) => {})
-    val aud = Name[Array[StringOrUri]]("aud", (v) => {
-      if(v.isEmpty)
-        throw new IllegalArgumentException("Audience list is empty")
-    })
+    val aud = Name[Array[StringOrUri]]("aud", checkIfEmptyArray("aud"))
     val exp = Name[IntDate]("exp", (v) => {})
     val nbf = Name[IntDate]("nbf", (v) => {})
     val iat = Name[IntDate]("iat", (v) => {})
-    val jti = Name[String]("typ", checkIfBlank)
+    val jti = Name[String]("jti", checkIfBlank("jit"))
 
   }
 

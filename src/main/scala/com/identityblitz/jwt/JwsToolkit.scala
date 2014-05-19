@@ -1,8 +1,39 @@
 package com.identityblitz.jwt
 
-import com.identityblitz.utils.json.{JObj, JVal}
+import com.identityblitz.utils.json._
+import java.net.URI
+import com.identityblitz.utils.json.JSuccess
+import scala.util.{Failure, Success, Try}
+import javax.security.cert.X509Certificate
 
-trait JwsToolkit extends AlgorithmsKit with JwtToolkit {
+trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
+
+  implicit object JUriReader extends JReader[URI] {
+    def read(v: JVal): JResult[URI] = v match {
+      case o: JStr => Try(new URI(o)) match {
+        case Success(r) => JSuccess(r)
+        case Failure(e) => JError(e.getMessage)
+      }
+      case _ => JError("json.error.expected.string")
+    }
+  }
+
+  implicit object JUriWriter extends JWriter[URI] {
+    def write(o: URI): JVal = JStr(o.toString)
+  }
+
+  trait JWSNameKit extends BaseNameKit {
+
+    val jku = Name[URI]("jku", (v) => {})
+    val jwk = Name[JWK]("jwk", (v) => {})
+    val kid = Name[String]("kid", checkIfBlank("kid"))
+    val x5u = Name[URI]("x5u", (v) => {})
+    val x5c = Name[Array[X509Certificate]]("x5c", checkIfEmptyArray("x5c"))
+    val x5t = Name[Array[Byte]]("x5t", (v) => {})
+
+  }
+
+  object JWSNameKit extends JWSNameKit
 
   /**
    * This traits is represents JWS header.
@@ -10,6 +41,15 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit {
   class JWS(val alg: Algorithm[JWS], values: JObj) extends Header[JWS] {
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
+
+    val jku: Option[URI] = values(JWSNameKit.jku.name).asOpt[URI]
+    val jwk: Option[JWK] = values(JWSNameKit.jwk.name).asOpt[JWK]
+    val kid: Option[String] = values(JWSNameKit.kid.name).asOpt[String]
+    val x5u: Option[URI] = values(JWSNameKit.x5u.name).asOpt[URI]
+    val x5c: Option[Array[X509Certificate]] = values(JWSNameKit.x5c.name).asOpt[Array[X509Certificate]]
+    val x5t: Option[Array[Byte]] = values(JWSNameKit.x5t.name).asOpt[Array[Byte]]
+
+
 
     def apply(name: String): JVal = values(name)
     def get(name: String): Option[JVal] = values(name).asOpt[JVal]
