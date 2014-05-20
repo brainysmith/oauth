@@ -3,6 +3,7 @@ package com.identityblitz.jwt
 import java.net.URI
 import javax.security.cert.X509Certificate
 import com.identityblitz.utils.json._
+import scala.annotation.implicitNotFound
 
 /**
  *
@@ -78,6 +79,33 @@ trait JwkToolkit {
     val x5c: Option[Array[X509Certificate]]
 
     val x5t: Option[Array[Byte]]
+
+  }
+
+  @implicitNotFound("No Kids register found. Try to implement an implicit KidsRegister.")
+  trait KidsRegister {
+
+    def apply(kid: String): JWK
+    def get(kid: String): Option[JWK]
+
+    def curKid(alg: String): JWK
+    def optCurKid(alg: String): Option[JWK]
+
+    def curKid(alg: String, ctx: Map[String, String]): JWK
+    def optCurKid(alg: String, ctx: Map[String, String]): Option[JWK]
+
+  }
+
+  @implicitNotFound("No cryptographic service found. Try to implement an implicit KidsRegister.")
+  trait CryptoService {
+
+    def sign(alg: String, jwk: JWK): Array[Byte]
+
+    def verify(alg: String, jwk: JWK, data: Array[Byte]): Boolean
+
+    def encrypt(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
+
+    def decrypt(alg: String, jwk: JWK, cipherText: Array[Byte]): Array[Byte]
 
   }
 

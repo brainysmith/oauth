@@ -30,6 +30,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     val x5u = Name[URI]("x5u", (v) => {})
     val x5c = Name[Array[X509Certificate]]("x5c", checkIfEmptyArray("x5c"))
     val x5t = Name[Array[Byte]]("x5t", (v) => {})
+    val crit = Name[Array[String]]("crit", checkIfEmptyArray("crit"))
 
   }
 
@@ -48,6 +49,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     val x5u: Option[URI] = values(JWSNameKit.x5u.name).asOpt[URI]
     val x5c: Option[Array[X509Certificate]] = values(JWSNameKit.x5c.name).asOpt[Array[X509Certificate]]
     val x5t: Option[Array[Byte]] = values(JWSNameKit.x5t.name).asOpt[Array[Byte]]
+    val crit: Option[Array[String]] = values(JWSNameKit.crit.name).asOpt[Array[String]]
 
 
 
@@ -72,6 +74,12 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
       }},
     j => j.header.asBase64 + "." + j.claimSet.asBase64 + ".",
     new JWSNone(_)
+  )
+
+  val HS256 = Algorithm[JWS]("none",
+    (hdr, tkn) => null,
+    j => null,
+    hdr => null
   )
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)
