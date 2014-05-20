@@ -39,7 +39,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
   /**
    * This traits is represents JWS header.
    */
-  class JWS(val alg: Algorithm[JWS], values: JObj) extends Header[JWS] {
+  class JWS(val alg: Algorithm[JWS, _], values: JObj) extends Header[JWS] {
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
@@ -63,7 +63,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     override def toString: String = (values + ("alg" -> alg.toString)).toString
   }
 
-  val none = Algorithm[JWS]("none",
+  val none = Algorithm[JWS, JWSNoneBuilder]("none",
     (hdr, tkn) => {
       if(!tkn.endsWith("."))
         throw new IllegalStateException("token has wrong format")
@@ -73,15 +73,24 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
         case _ => throw new IllegalStateException("token has wrong format")
       }},
     j => j.header.asBase64 + "." + j.claimSet.asBase64 + ".",
-    new JWSNone(_)
+    new JWSNone(_),
+    new JWSNoneBuilder(_)
   )
 
-  val HS256 = Algorithm[JWS]("none",
+  val HS256 = Algorithm[JWS, JWSBuilder]("HS256",
     (hdr, tkn) => null,
     j => null,
-    hdr => null
+    hdr => null,
+    new JWSBuilder(_)
   )
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)
 
+  sealed class JWSNoneBuilder(alg: Algorithm[JWS, JWSNoneBuilder]) {
+    def header(hs: (String, JVal)*) = ???
+  }
+
+  sealed class JWSBuilder(alg: Algorithm[JWS, JWSBuilder]) {
+    def header(hs: (String, JVal)*)(implicit crypto: CryptoService) = ???
+  }
 }

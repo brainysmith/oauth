@@ -121,7 +121,7 @@ trait JwtToolkit {
    */
   trait Header[H <: Header[H]] {
 
-    val alg: Algorithm[H]
+    val alg: Algorithm[H, _]
     val typ: Option[String]
     val cty: Option[String]
 
@@ -215,7 +215,7 @@ trait JwtToolkit {
    * @return - JWT token builder
    */
   def builder = new {
-    def alg[H <: Header[H]](a: Algorithm[H]) = new {
+    def alg[H <: Header[H], B](a: Algorithm[H, B]) = new {
       val _alg = a
       def header(hs: (String, JVal)*) = new {
         val header = JObj(hs)
@@ -224,6 +224,10 @@ trait JwtToolkit {
         }
       }
     }
+  }
+
+  def builder2 = new {
+    def alg[H <: Header[H], B](a: Algorithm[H, B]) = a.headerBuilder
   }
 
   object JWT {
@@ -288,14 +292,14 @@ abstract class AlgorithmsKit extends JwtToolkit {
                                              ds: (JObj, String) => JWT[H],
                                              sz: (JWT[H]) => String,
                                              mkh: (JObj) => H,
-                                             crBld: () => B): Algorithm[H, B] =
+                                             crBld: (Algorithm[H, B]) => B): Algorithm[H, B] =
     new AlgorithmItem[H, B](name, ds, sz, mkh, crBld)
 
   private class AlgorithmItem[H <: Header[H], B](val name: String,
                                                  val ds: (JObj, String) => JWT[H],
                                                  val sz: (JWT[H]) => String,
                                                  val mkh: (JObj) => H,
-                                                 val crBld: () => B) extends Algorithm[H, B] {
+                                                 val crBld: (Algorithm[H, B]) => B) extends Algorithm[H, B] {
     thisKit.aMap(name) = this
 
     def apply(header: JObj, token: String): JWT[H] = ds(header, token)
@@ -306,7 +310,7 @@ abstract class AlgorithmsKit extends JwtToolkit {
 
     override def toString: String = name
 
-    def headerBuilder: B = crBld()
+    def headerBuilder: B = crBld(this)
   }
 
 }
