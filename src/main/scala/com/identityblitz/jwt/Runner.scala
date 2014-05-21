@@ -2,7 +2,7 @@ package com.identityblitz.jwt
 
 import java.lang.System
 
-object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit
+object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with DefaultCryptoServiceContainer
 
 object Runner {
 
@@ -11,27 +11,48 @@ object Runner {
 
     val plainJwt = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
 
-    val jwt = JWT(plainJwt)
+    val jwt = JWT[ClaimsSet](plainJwt)
 
     System.out.println(jwt.header.alg.name)
     System.out.println(jwt.header.typ)
 
-    System.out.println(jwt.claimSet.iss.get)
-    System.out.println(jwt.claimSet.exp.get)
-    System.out.println(jwt.claimSet.names)
+    System.out.println(jwt.payload.iss.get)
+    System.out.println(jwt.payload.exp.get)
+    System.out.println(jwt.payload.names)
 
     import BaseNameKit._
 
-    val jwt2 = builder
-      .alg(none)
-      .header (typ % "JWT")
-      .cs (
+    val jwt2 =  builder.alg(none)
+      .header(typ % "JWT")
+      .payload(cs(
       iss % StringOrUri("joe"),
-      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3")))
+      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3")),
+      iss % StringOrUri("joe")))
       .build
 
     System.out.println(jwt2)
     System.out.println(jwt2 asBase64)
+
+
+
+    val jwt3 = builder.alg(HS256).
+      header(typ % "JWT")
+      .payload(cs(
+      iss % StringOrUri("joe"),
+      aud % Array(StringOrUri("aud1"), StringOrUri("aud2"), StringOrUri("aud3")),
+      iss % StringOrUri("joe")))
+      .build
+
+    System.out.println(jwt3)
+    System.out.println(jwt3 asBase64)
+
+    val strJwtHS256 = "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    val jwtHS256 = JWT[ClaimsSet](strJwtHS256)
+
+    System.out.println(jwtHS256)
+
+
+
 
   }
 

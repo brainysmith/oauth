@@ -96,12 +96,12 @@ trait JwkToolkit {
 
   }
 
-  @implicitNotFound("No cryptographic service found. Try to implement an implicit KidsRegister.")
+  @implicitNotFound("No cryptographic service found. Try to implement an implicit CryptoService.")
   trait CryptoService {
 
-    def sign(alg: String, jwk: JWK): Array[Byte]
+    def sign(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
 
-    def verify(alg: String, jwk: JWK, data: Array[Byte]): Boolean
+    def verify(alg: String, jwk: JWK, plainText: Array[Byte], signature: Array[Byte]): Boolean
 
     def encrypt(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
 

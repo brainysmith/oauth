@@ -4,6 +4,7 @@ import scala.collection.mutable
 import com.identityblitz.utils.json._
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.lang.StringUtils
+import scala.annotation.implicitNotFound
 
 /**
  * The JSON Web Token (JWT) toolkit is to work with JWT token. The current implementation is based on
@@ -15,7 +16,7 @@ trait JwtToolkit {
   /**
    * This trait represents algorithm being used to encrypt or sign an JWT.
    */
-  trait Algorithm[H <: Header[H], B] {
+  trait Algorithm[H <: Header[H], HB] {
 
     val name: String
 
@@ -26,7 +27,7 @@ trait JwtToolkit {
      * @param token - string representation of the token
      * @return - JWT instance
      */
-    def apply(header: JObj, token: String): JWT[H]
+    def apply[B](header: JObj, token: String)(implicit pc: PayloadConverter[B]): JWT[H, B]
 
     /**
      * Serializes an jwt instance into its string representation and do signing or MACing for JWS tokens and
@@ -34,7 +35,7 @@ trait JwtToolkit {
      * @param jwt - JWT instance
      * @return - string representation of the token
      */
-    def apply(jwt :JWT[H]): String
+    def apply(header: H, payload: Array[Byte]): String
 
     /**
      * Builds JWT header corresponding to the current algorithm.
@@ -42,9 +43,9 @@ trait JwtToolkit {
      * @param cs - claims set (TODO: think of necessity of passing in a claim set)
      * @return - header
      */
-    def apply(header: JObj, cs: JObj): JWT[H]
+    def apply[B](header: H, pl: B)(implicit pc: PayloadConverter[B]): JWT[H, B]
 
-    def headerBuilder: B
+    def headerBuilder: HB
 
   }
 
@@ -135,38 +136,14 @@ trait JwtToolkit {
   }
 
   /**
-   * The Claims set representation.
-   * @param values
-   */
-  class ClaimsSet(val values: JObj) {
-
-    val iss: Option[StringOrUri] = values(BaseNameKit.iss.name).asOpt[StringOrUri]
-    val sub: Option[StringOrUri] = values(BaseNameKit.sub.name).asOpt[StringOrUri]
-    val aud: Option[Seq[StringOrUri]] = values(BaseNameKit.aud.name).asOpt[Seq[StringOrUri]]
-    val exp: Option[IntDate] = values(BaseNameKit.exp.name).asOpt[IntDate]
-    val nbf: Option[IntDate] = values(BaseNameKit.nbf.name).asOpt[IntDate]
-    val iat: Option[IntDate] = values(BaseNameKit.iat.name).asOpt[IntDate]
-    val jti: Option[String] = values(BaseNameKit.jti.name).asOpt[String]
-
-    def apply(name: String): JVal = values.apply(name)
-    def get(name: String): Option[JVal] = values.asOpt[JVal]
-
-    def names:Set[String] = values.fields
-
-    def asBase64: String = utf8StringToBase64(values.toJson)
-
-    override def toString: String = values.toString
-  }
-
-  /**
    * Represents JSON Web token instance.
    * @tparam H - type of the header
    */
-  trait JWT[H <: Header[H]] {
+  trait JWT[H <: Header[H], B] {
 
     val header: H
 
-    val claimSet: ClaimsSet
+    val payload: B
 
     def asBase64: String
   }
@@ -177,11 +154,12 @@ trait JwtToolkit {
    * @param cs - claims set
    * @tparam H - type of the header
    */
-  protected sealed class JWTBase[H <: Header[H]](val header: H, cs: JObj) extends JWT[H] {
+  protected sealed class JWTBase[H <: Header[H], B](val header: H, val cs: B, private val pc: PayloadConverter[B])
+    extends JWT[H, B] {
 
-    val claimSet: ClaimsSet = new ClaimsSet(cs)
+    val payload: B = cs
 
-    def asBase64: String = header.alg.apply(this)
+    def asBase64: String = header.alg.apply(header, pc.toBytes(cs))
 
     override def toString: String = header.toString + "." + cs.toString
 
@@ -204,8 +182,8 @@ trait JwtToolkit {
    * .alg(none)
    * .header (typ % "JWT",
    *         "http://mydomain.com/type" % "idToken")
-   * .cs (iss % StringOrUri("john"),
-   *     "http://mydomain.com/trusted" % true)
+   * .payload( cs (iss % StringOrUri("john"),
+   *     "http://mydomain.com/trusted" % true))
    * .build
    * }}}
    * The header parameters and claims names can be passed in as string or as predefined name objects.
@@ -214,20 +192,55 @@ trait JwtToolkit {
    * To use them import [[com.identityblitz.jwt.JwtToolkit.BaseNameKit]] object.
    * @return - JWT token builder
    */
+
   def builder = new {
-    def alg[H <: Header[H], B](a: Algorithm[H, B]) = new {
-      val _alg = a
-      def header(hs: (String, JVal)*) = new {
-        val header = JObj(hs)
-        def cs(s: (String, JVal)*) = new {
-          def build = a.apply(header, JObj(s))
-        }
-      }
-    }
+    def alg[H <: Header[H], B](a: Algorithm[H, B]) = a.headerBuilder
   }
 
-  def builder2 = new {
-    def alg[H <: Header[H], B](a: Algorithm[H, B]) = a.headerBuilder
+  @implicitNotFound("No converter found for type ${C}. Try to implement an implicit PayloadConverter.")
+  trait PayloadConverter[C] {
+    def toBytes(orig: C): Array[Byte]
+    def fromBytes(a: Array[Byte]): C
+  }
+
+  trait PayloadBuilder[H <: Header[H]] {
+    val header: H
+    def payload[C](c: C)(implicit pc: PayloadConverter[C]) = new JWTBuilder[H, C](header, c)
+  }
+
+  class JWTBuilder[H <: Header[H], B](hdr: H, pl: B)(implicit pc: PayloadConverter[B]) {
+    def build: JWT[H, B] = hdr.alg.apply(hdr, pl)
+  }
+
+  /**
+   * The Claims set representation.
+   * @param values
+   */
+  class ClaimsSet(val values: JObj) {
+
+    val iss: Option[StringOrUri] = values(BaseNameKit.iss.name).asOpt[StringOrUri]
+    val sub: Option[StringOrUri] = values(BaseNameKit.sub.name).asOpt[StringOrUri]
+    val aud: Option[Seq[StringOrUri]] = values(BaseNameKit.aud.name).asOpt[Seq[StringOrUri]]
+    val exp: Option[IntDate] = values(BaseNameKit.exp.name).asOpt[IntDate]
+    val nbf: Option[IntDate] = values(BaseNameKit.nbf.name).asOpt[IntDate]
+    val iat: Option[IntDate] = values(BaseNameKit.iat.name).asOpt[IntDate]
+    val jti: Option[String] = values(BaseNameKit.jti.name).asOpt[String]
+
+    def apply(name: String): JVal = values.apply(name)
+    def get(name: String): Option[JVal] = values.asOpt[JVal]
+
+    def names:Set[String] = values.fields
+
+    def asBytes: Array[Byte] = values.toJson.getBytes("UTF-8")
+
+    override def toString: String = values.toString
+  }
+
+  def cs(set: (String, JVal)*) = new ClaimsSet(JObj(set))
+
+  implicit object claimSetPConverter extends PayloadConverter[ClaimsSet]{
+    def toBytes(orig: ClaimsSet): Array[Byte] = orig.asBytes
+    def fromBytes(a: Array[Byte]): ClaimsSet = new ClaimsSet(JVal.parseStr(new String(a, "UTF-8")).as[JObj])
   }
 
   object JWT {
@@ -237,10 +250,11 @@ trait JwtToolkit {
      * @param strJWT - string representation of the JWT token
      * @return - JWT instance
      */
-    def apply(strJWT: String): JWT[_ <: Header[_]] = {
+    def apply[B](strJWT: String)(implicit pc: PayloadConverter[B]): JWT[_ <: Header[_], B] = {
       val header = JVal.parseStr(base64ToUtf8String(strJWT.takeWhile(_ != '.'))).as[JObj]
-      header("alg").asOpt[String].map(n => self.optByName(n).map(_(header, strJWT))
-        .orElse(throw new IllegalStateException("unknown algorithm ["+ n +"]")))
+      header("alg").asOpt[String].map(n => self.optByName(n).map( a =>  {
+        a.apply[B](header, strJWT)
+      }).orElse(throw new IllegalStateException("unknown algorithm ["+ n +"]")))
         .orElse(throw new IllegalStateException("not found mandatory header parameter [alg]")).get.get
     }
 
@@ -288,29 +302,31 @@ abstract class AlgorithmsKit extends JwtToolkit {
    * @tparam H - type of the header.
    * @return - newly created algorithm.
    */
-  protected def Algorithm[H <: Header[H], B](name: String,
-                                             ds: (JObj, String) => JWT[H],
-                                             sz: (JWT[H]) => String,
-                                             mkh: (JObj) => H,
-                                             crBld: (Algorithm[H, B]) => B): Algorithm[H, B] =
-    new AlgorithmItem[H, B](name, ds, sz, mkh, crBld)
+  protected def Algorithm[H <: Header[H], HB](name: String,
+                                              ds: (Algorithm[H, HB], JObj, String) => (H, Array[Byte]),
+                                              sz: (H, Array[Byte]) => String,
+                                              hdrBld: (Algorithm[H, HB]) => HB): Algorithm[H, HB] =
+    new AlgorithmItem[H, HB](name, ds, sz, hdrBld)
 
-  private class AlgorithmItem[H <: Header[H], B](val name: String,
-                                                 val ds: (JObj, String) => JWT[H],
-                                                 val sz: (JWT[H]) => String,
-                                                 val mkh: (JObj) => H,
-                                                 val crBld: (Algorithm[H, B]) => B) extends Algorithm[H, B] {
+  private class AlgorithmItem[H <: Header[H], HB](val name: String,
+                                                  val ds: (Algorithm[H, HB], JObj, String) => (H, Array[Byte]),
+                                                  val sz: (H, Array[Byte]) => String,
+                                                  val hdrBld: (Algorithm[H, HB]) => HB) extends Algorithm[H, HB] {
     thisKit.aMap(name) = this
 
-    def apply(header: JObj, token: String): JWT[H] = ds(header, token)
+    def apply[B](header: JObj, token: String)(implicit pc: PayloadConverter[B]): JWT[H, B] = {
+      val t = ds(this, header, token)
+      new JWTBase[H, B](t._1, pc.fromBytes(t._2), pc)
+    }
 
-    def apply(jwt: JWT[H]): String = sz(jwt)
+    def apply(header: H, payload: Array[Byte]): String = sz(header, payload)
 
-    def apply(header: JObj, cs: JObj): JWT[H] = new JWTBase[H](mkh(header), cs)
+    def apply[B](header: H, pl: B)(implicit pc: PayloadConverter[B]): JWT[H, B] =
+      new JWTBase[H, B](header, pl, pc)
 
     override def toString: String = name
 
-    def headerBuilder: B = crBld(this)
+    def headerBuilder: HB = hdrBld(this)
   }
 
 }

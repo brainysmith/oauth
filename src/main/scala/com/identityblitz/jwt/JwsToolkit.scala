@@ -5,8 +5,12 @@ import java.net.URI
 import com.identityblitz.utils.json.JSuccess
 import scala.util.{Failure, Success, Try}
 import javax.security.cert.X509Certificate
+import org.apache.commons.codec.binary.Base64
+import org.apache.commons.codec.binary
 
 trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
+
+  val cryptoService: CryptoService
 
   implicit object JUriReader extends JReader[URI] {
     def read(v: JVal): JResult[URI] = v match {
@@ -39,7 +43,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
   /**
    * This traits is represents JWS header.
    */
-  class JWS(val alg: Algorithm[JWS, _], values: JObj) extends Header[JWS] {
+  class JWS(val alg: Algorithm[JWS, _], values: JObj)(implicit val crypto: CryptoService) extends Header[JWS] {
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
@@ -64,33 +68,62 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
   }
 
   val none = Algorithm[JWS, JWSNoneBuilder]("none",
-    (hdr, tkn) => {
+    (alg, hdr, tkn) => {
       if(!tkn.endsWith("."))
         throw new IllegalStateException("token has wrong format")
       tkn.split("\\.").toList match {
-        case _ :: cs :: Nil =>
-          new JWTBase[JWS](new JWSNone(hdr), JVal.parseStr(base64ToUtf8String(cs)).as[JObj])
+        case _ :: pl :: Nil => (new JWSNone(hdr), Base64.decodeBase64(pl))
         case _ => throw new IllegalStateException("token has wrong format")
       }},
-    j => j.header.asBase64 + "." + j.claimSet.asBase64 + ".",
-    new JWSNone(_),
+    (hdr, pl) => hdr.asBase64 + "." + Base64.encodeBase64URLSafeString(pl),
     new JWSNoneBuilder(_)
   )
 
   val HS256 = Algorithm[JWS, JWSBuilder]("HS256",
-    (hdr, tkn) => null,
-    j => null,
-    hdr => null,
+    deserializeJWS(cryptoService),
+    serializeJWS,
     new JWSBuilder(_)
   )
 
-  private sealed class JWSNone(private val values: JObj) extends JWS(none, values)
+  def serializeJWS(hdr: JWS, pl: Array[Byte]) = {
+    val hpl = hdr.asBase64 + "." + Base64.encodeBase64URLSafeString(pl)
+    val signature = Base64.encodeBase64URLSafeString(hdr.crypto.sign(hdr.alg.name, null, hpl.getBytes("US-ASCII")))
+    hpl + "." + signature
+  }
 
-  sealed class JWSNoneBuilder(alg: Algorithm[JWS, JWSNoneBuilder]) {
-    def header(hs: (String, JVal)*) = ???
+  def deserializeJWS(cs: CryptoService)(alg: Algorithm[JWS, _], hdr: JObj, tkn: String) = {
+    tkn.split("\\.").toList match {
+      case h :: pl :: mac ::Nil =>
+        val jws = new JWS(alg, hdr)(cs)
+        if(!cs.verify(alg.name, null, (h + "." + pl).getBytes("US-ASCII"),Base64.decodeBase64(mac)))
+          throw new IllegalStateException("MAC is wrong.")
+        (jws, Base64.decodeBase64(pl))
+      case _ => throw new IllegalStateException("token has wrong format")
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  private sealed class JWSNone(private val values: JObj) extends JWS(none, values)(null)
+
+  sealed class JWSNoneBuilder(_alg: Algorithm[JWS, JWSNoneBuilder]) {
+    def header(hs: (String, JVal)*) = new PayloadBuilder[JWS] {
+      val header: JWS = new JWSNone(JObj(hs))
+    }
   }
 
   sealed class JWSBuilder(alg: Algorithm[JWS, JWSBuilder]) {
-    def header(hs: (String, JVal)*)(implicit crypto: CryptoService) = ???
+    def header(hs: (String, JVal)*)(implicit crypto: CryptoService) = new PayloadBuilder[JWS] {
+      val header: JWS = new JWS(alg, JObj(hs))
+    }
   }
 }
