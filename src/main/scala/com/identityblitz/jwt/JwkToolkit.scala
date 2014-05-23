@@ -4,6 +4,11 @@ import java.net.URI
 import javax.security.cert.X509Certificate
 import com.identityblitz.utils.json._
 import scala.annotation.implicitNotFound
+import org.apache.commons.codec.binary.Base64
+import scala.util.{Failure, Success, Try}
+import scala.util.Success
+import scala.util.Failure
+import com.identityblitz.utils.json.JSuccess
 
 /**
  *
@@ -40,12 +45,37 @@ trait JwkToolkit {
     def write(o: Array[Byte]): JVal = throw new UnsupportedOperationException("not realised yet")
   }
 
-  trait Kty
+  implicit object JUriReader extends JReader[URI] {
+    def read(v: JVal): JResult[URI] = v match {
+      case o: JStr => Try(new URI(o)) match {
+        case Success(r) => JSuccess(r)
+        case Failure(e) => JError(e.getMessage)
+      }
+      case _ => JError("json.error.expected.string")
+    }
+  }
+
+  implicit object JUriWriter extends JWriter[URI] {
+    def write(o: URI): JVal = JStr(o.toString)
+  }
 
   object Use extends Enumeration {
     type Use = Value
     val sig = Value("sig")
     val enc = Value("enc")
+
+
+    implicit object JUseReader extends JReader[Use] {
+      def read(v: JVal): JResult[Use] = v match {
+        case JStr(s) => Use.values.find(_.toString == s).map(JSuccess(_))
+          .orElse(Option(JError("json.error.worngValueOfUse"))).get
+        case _ => JError("json.error.expected.string")
+      }
+    }
+
+    implicit object JUseWriter extends JWriter[Use] {
+      def write(o: Use): JVal = JStr(o.toString)
+    }
   }
   import Use._
 
@@ -59,16 +89,28 @@ trait JwkToolkit {
     val unwrapKey = Value("unwrapKey")
     val deriveKey = Value("deriveKey")
     val deriveBits = Value("deriveBits")
+
+    implicit object JKeyOpsReader extends JReader[KeyOps]{
+      def read(v: JVal): JResult[KeyOps] = v match {
+        case JStr(s) => KeyOps.values.find(_.toString == s).map(JSuccess(_))
+          .orElse(Option(JError("json.error.worngValueOfKeyOps"))).get
+        case _ => JError("json.error.expected.string")
+      }
+    }
+
+    implicit object JKeyOpsWriter extends JWriter[KeyOps] {
+      def write(o: KeyOps): JVal = JStr(o.toString)
+    }
   }
   import KeyOps._
 
   trait JWK {
 
-    val kty: Kty
+    val kty: String
 
     val use: Option[Use]
 
-    val key_ops: Option[KeyOps]
+    val key_ops: Option[Set[KeyOps]]
 
     val alg: Option[String]
 
@@ -79,6 +121,235 @@ trait JwkToolkit {
     val x5c: Option[Array[X509Certificate]]
 
     val x5t: Option[Array[Byte]]
+
+  }
+
+  class EcPublicKey(val crv: String,
+                    val x: Array[Byte],
+                    val y: Array[Byte],
+                    val use: Option[Use],
+                    val key_ops: Option[Set[KeyOps]],
+                    val alg: Option[String],
+                    val kid: Option[String],
+                    val x5u: Option[URI],
+                    val x5c: Option[Array[X509Certificate]],
+                    val x5t: Option[Array[Byte]]) extends JWK {
+
+    //add some checks
+
+    val kty: String = "EC"
+
+  }
+
+  object EcPublicKey {
+
+    implicit object JEcPublicKeyReader extends JReader[EcPublicKey] {
+      def read(v: JVal): JResult[EcPublicKey] = {
+        JSuccess(new EcPublicKey((v \ "crv").as[String],
+          Base64.decodeBase64((v \ "x").as[String]),
+          Base64.decodeBase64((v \ "y").as[String]),
+          (v \ "use").asOpt[Use],
+          (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
+          (v \ "alg").asOpt[String],
+          (v \ "kid").asOpt[String],
+          (v \ "x5u").asOpt[URI],
+          (v \ "x5c").asOpt[Array[X509Certificate]],
+          (v \ "x5t").asOpt[Array[Byte]]))
+      }
+    }
+
+    def unapply(jwk: JObj): Option[EcPublicKey] =
+      if(jwk("kty").as[String] == "EC" &&
+        jwk.fields.contains("crv") &&
+        jwk.fields.contains("x") &&
+        jwk.fields.contains("y") &&
+        !jwk.fields.contains("d")) jwk.asOpt[EcPublicKey] else None
+
+  }
+
+  class EcPrivateKey(val crv: String,
+                     val x: Array[Byte],
+                     val y: Array[Byte],
+                     val d: Array[Byte],
+                     val use: Option[Use],
+                     val key_ops: Option[Set[KeyOps]],
+                     val alg: Option[String],
+                     val kid: Option[String],
+                     val x5u: Option[URI],
+                     val x5c: Option[Array[X509Certificate]],
+                     val x5t: Option[Array[Byte]]) extends JWK {
+
+    //add some checks
+
+    val kty: String = "EC"
+  }
+
+  object EcPrivateKey {
+
+    implicit object JEcPrivateKeyReader extends JReader[EcPrivateKey] {
+      def read(v: JVal): JResult[EcPrivateKey] = {
+        JSuccess(new EcPrivateKey((v \ "crv").as[String],
+          Base64.decodeBase64((v \ "x").as[String]),
+          Base64.decodeBase64((v \ "y").as[String]),
+          Base64.decodeBase64((v \ "d").as[String]),
+          (v \ "use").asOpt[Use],
+          (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
+          (v \ "alg").asOpt[String],
+          (v \ "kid").asOpt[String],
+          (v \ "x5u").asOpt[URI],
+          (v \ "x5c").asOpt[Array[X509Certificate]],
+          (v \ "x5t").asOpt[Array[Byte]]
+        ))
+      }
+    }
+
+    def unapply(jwk: JObj): Option[EcPrivateKey] =
+      if(jwk.fields.contains("crv") &&
+        jwk.fields.contains("x") &&
+        jwk.fields.contains("y") &&
+        jwk.fields.contains("d")) jwk.asOpt[EcPrivateKey] else None
+
+  }
+
+  class RsaPublicKey(val n: Array[Byte],
+                     val e: Array[Byte],
+                     val use: Option[Use],
+                     val key_ops: Option[Set[KeyOps]],
+                     val alg: Option[String],
+                     val kid: Option[String],
+                     val x5u: Option[URI],
+                     val x5c: Option[Array[X509Certificate]],
+                     val x5t: Option[Array[Byte]]) extends JWK {
+
+    //add some checks
+
+    val kty: String = "RSA"
+
+  }
+
+  object RsaPublicKey {
+
+    implicit object JRsaPublicKeyReader extends JReader[RsaPublicKey] {
+      def read(v: JVal): JResult[RsaPublicKey] = {
+        JSuccess(new RsaPublicKey(Base64.decodeBase64((v \ "n").as[String]),
+          Base64.decodeBase64((v \ "e").as[String]),
+          (v \ "use").asOpt[Use],
+          (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
+          (v \ "alg").asOpt[String],
+          (v \ "kid").asOpt[String],
+          (v \ "x5u").asOpt[URI],
+          (v \ "x5c").asOpt[Array[X509Certificate]],
+          (v \ "x5t").asOpt[Array[Byte]]))
+      }
+    }
+
+    def unapply(jwk: JObj): Option[RsaPublicKey] =
+      if(jwk("kty").as[String] == "RSA" &&
+        jwk.fields.contains("n") &&
+        jwk.fields.contains("e") &&
+        !jwk.fields.contains("d")) jwk.asOpt[RsaPublicKey] else None
+
+  }
+
+  class PrimeInfo(val r: Array[Byte],
+                  val d: Array[Byte],
+                  val t: Array[Byte])
+
+  class RsaPrivateKey(val n: Array[Byte],
+                      val e: Array[Byte],
+                      val d: Array[Byte],
+                      val p: Option[Array[Byte]],
+                      val q: Option[Array[Byte]],
+                      val dp: Option[Array[Byte]],
+                      val dq: Option[Array[Byte]],
+                      val di: Option[Array[Byte]],
+                      val oth: Option[Array[PrimeInfo]],
+                      val use: Option[Use],
+                      val key_ops: Option[Set[KeyOps]],
+                      val alg: Option[String],
+                      val kid: Option[String],
+                      val x5u: Option[URI],
+                      val x5c: Option[Array[X509Certificate]],
+                      val x5t: Option[Array[Byte]]) extends JWK {
+
+
+    //add some checks
+
+    val kty: String = "RSA"
+
+  }
+
+  object RsaPrivateKey {
+
+    implicit object JPrimeInfo extends JReader[PrimeInfo]{
+      def read(v: JVal): JResult[PrimeInfo] = JSuccess(new PrimeInfo(Base64.decodeBase64((v \ "r").as[String]),
+        Base64.decodeBase64((v \ "d").as[String]),
+        Base64.decodeBase64((v \ "t").as[String])))
+    }
+
+    implicit object JRsaPrivateKeyReader extends JReader[RsaPrivateKey] {
+      def read(v: JVal): JResult[RsaPrivateKey] = {
+        JSuccess(new RsaPrivateKey(Base64.decodeBase64((v \ "n").as[String]),
+          Base64.decodeBase64((v \ "e").as[String]),
+          Base64.decodeBase64((v \ "d").as[String]),
+          (v \ "p").asOpt[String].map(Base64.decodeBase64),
+          (v \ "q").asOpt[String].map(Base64.decodeBase64),
+          (v \ "dp").asOpt[String].map(Base64.decodeBase64),
+          (v \ "dq").asOpt[String].map(Base64.decodeBase64),
+          (v \ "di").asOpt[String].map(Base64.decodeBase64),
+          (v \ "oth").asOpt[Array[PrimeInfo]],
+          (v \ "use").asOpt[Use],
+          (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
+          (v \ "alg").asOpt[String],
+          (v \ "kid").asOpt[String],
+          (v \ "x5u").asOpt[URI],
+          (v \ "x5c").asOpt[Array[X509Certificate]],
+          (v \ "x5t").asOpt[Array[Byte]]))
+      }
+    }
+
+    def unapply(jwk: JObj): Option[RsaPrivateKey] =
+      if(jwk("kty").as[String] == "RSA" &&
+        jwk.fields.contains("n") &&
+        jwk.fields.contains("e") &&
+        jwk.fields.contains("d")) jwk.asOpt[RsaPrivateKey] else None
+
+  }
+
+  class SymmetricKey(val k: Array[Byte],
+                     val use: Option[Use],
+                     val key_ops: Option[Set[KeyOps]],
+                     val alg: Option[String],
+                     val kid: Option[String],
+                     val x5u: Option[URI],
+                     val x5c: Option[Array[X509Certificate]],
+                     val x5t: Option[Array[Byte]]) extends JWK {
+
+
+    //add some checks
+
+    val kty: String = "oct"
+
+  }
+
+  object SymmetricKey {
+
+    implicit object JRsaPrivateKeyReader extends JReader[SymmetricKey] {
+      def read(v: JVal): JResult[SymmetricKey] = {
+        JSuccess(new SymmetricKey(Base64.decodeBase64((v \ "k").as[String]),
+          (v \ "use").asOpt[Use],
+          (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
+          (v \ "alg").asOpt[String],
+          (v \ "kid").asOpt[String],
+          (v \ "x5u").asOpt[URI],
+          (v \ "x5c").asOpt[Array[X509Certificate]],
+          (v \ "x5t").asOpt[Array[Byte]]))
+      }
+    }
+
+    def unapply(jwk: JObj): Option[SymmetricKey] =
+      if(jwk("kty").as[String] == "oct" &&
+        jwk.fields.contains("k")) jwk.asOpt[SymmetricKey] else None
 
   }
 

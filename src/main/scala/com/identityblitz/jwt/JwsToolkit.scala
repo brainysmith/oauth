@@ -12,20 +12,6 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
 
   val cryptoService: CryptoService
 
-  implicit object JUriReader extends JReader[URI] {
-    def read(v: JVal): JResult[URI] = v match {
-      case o: JStr => Try(new URI(o)) match {
-        case Success(r) => JSuccess(r)
-        case Failure(e) => JError(e.getMessage)
-      }
-      case _ => JError("json.error.expected.string")
-    }
-  }
-
-  implicit object JUriWriter extends JWriter[URI] {
-    def write(o: URI): JVal = JStr(o.toString)
-  }
-
   trait JWSNameKit extends BaseNameKit {
 
     val jku = Name[URI]("jku", (v) => {})
