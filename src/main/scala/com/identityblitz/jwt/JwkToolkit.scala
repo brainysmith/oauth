@@ -15,9 +15,19 @@ import com.identityblitz.utils.json.JSuccess
  */
 trait JwkToolkit {
 
+  val cryptoService: CryptoService
+
   implicit object JwkReader extends JReader[JWK] {
     def read(v: JVal): JResult[JWK] = v match {
-      case _ => JError("not realised yet")
+      case o: JObj => o match {
+        case EcPublicKey(e) => JSuccess(e)
+        case EcPrivateKey(e) => JSuccess(e)
+        case RsaPublicKey(e) => JSuccess(e)
+        case RsaPrivateKey(e) => JSuccess(e)
+        case SymmetricKey(e) => JSuccess(e)
+        case _ => JError("json.error.unknownJwk")
+      }
+      case _ => JError("json.error.expected.object")
     }
   }
 
@@ -27,7 +37,11 @@ trait JwkToolkit {
 
   implicit object JX509Reader extends JReader[X509Certificate] {
     def read(v: JVal): JResult[X509Certificate] = v match {
-      case _ => JError("not realised yet")
+      case JStr(s) => Try(cryptoService.createX509Cert(Base64.decodeBase64(s))) match {
+        case Success(cert) => JSuccess(cert)
+        case Failure(err) => JError(err.getMessage)
+      }
+      case _ => JError("json.error.expected.string")
     }
   }
 
@@ -37,7 +51,8 @@ trait JwkToolkit {
 
   implicit object JBytesReader extends JReader[Array[Byte]] {
     def read(v: JVal): JResult[Array[Byte]] = v match {
-      case _ => JError("not realised yet")
+      case JStr(s) => JSuccess(Base64.decodeBase64(s))
+      case _ => JError("json.error.expected.string")
     }
   }
 
@@ -334,7 +349,7 @@ trait JwkToolkit {
 
   object SymmetricKey {
 
-    implicit object JRsaPrivateKeyReader extends JReader[SymmetricKey] {
+    implicit object JSymmetricKeyReader extends JReader[SymmetricKey] {
       def read(v: JVal): JResult[SymmetricKey] = {
         JSuccess(new SymmetricKey(Base64.decodeBase64((v \ "k").as[String]),
           (v \ "use").asOpt[Use],
@@ -377,6 +392,8 @@ trait JwkToolkit {
     def encrypt(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
 
     def decrypt(alg: String, jwk: JWK, cipherText: Array[Byte]): Array[Byte]
+
+    def createX509Cert(der: Array[Byte]): X509Certificate
 
   }
 

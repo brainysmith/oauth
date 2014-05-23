@@ -1,6 +1,7 @@
 package com.identityblitz.jwt
 
 import java.lang.System
+import com.identityblitz.utils.json.JVal
 
 object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with DefaultCryptoServiceContainer
 
@@ -50,6 +51,15 @@ object Runner {
     val jwtHS256 = JWT[ClaimsSet](strJwtHS256)
 
     System.out.println(jwtHS256)
+
+    val publEc = JVal.parseStr("""{"kty":"EC",
+                      "crv":"P-256",
+                      "x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4",
+                      "y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM",
+                      "use":"enc",
+                      "kid":"1"}""").as[JWK]
+
+    System.out.println("")
 
 
 
