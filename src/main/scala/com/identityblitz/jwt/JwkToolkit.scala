@@ -9,6 +9,7 @@ import scala.util.{Failure, Success, Try}
 import scala.util.Success
 import scala.util.Failure
 import com.identityblitz.utils.json.JSuccess
+import java.math.BigInteger
 
 /**
  *
@@ -226,8 +227,8 @@ trait JwkToolkit {
 
   }
 
-  class RsaPublicKey(val n: Array[Byte],
-                     val e: Array[Byte],
+  class RsaPublicKey(val n: BigInteger,
+                     val e: BigInteger,
                      val use: Option[Use],
                      val key_ops: Option[Set[KeyOps]],
                      val alg: Option[String],
@@ -246,8 +247,8 @@ trait JwkToolkit {
 
     implicit object JRsaPublicKeyReader extends JReader[RsaPublicKey] {
       def read(v: JVal): JResult[RsaPublicKey] = {
-        JSuccess(new RsaPublicKey(Base64.decodeBase64((v \ "n").as[String]),
-          Base64.decodeBase64((v \ "e").as[String]),
+        JSuccess(new RsaPublicKey(new BigInteger(1, Base64.decodeBase64((v \ "n").as[String])),
+          new BigInteger(1, Base64.decodeBase64((v \ "e").as[String])),
           (v \ "use").asOpt[Use],
           (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),
           (v \ "alg").asOpt[String],
@@ -266,18 +267,18 @@ trait JwkToolkit {
 
   }
 
-  class PrimeInfo(val r: Array[Byte],
-                  val d: Array[Byte],
-                  val t: Array[Byte])
+  class PrimeInfo(val r: BigInteger,
+                  val d: BigInteger,
+                  val t: BigInteger)
 
-  class RsaPrivateKey(val n: Array[Byte],
-                      val e: Array[Byte],
-                      val d: Array[Byte],
-                      val p: Option[Array[Byte]],
-                      val q: Option[Array[Byte]],
-                      val dp: Option[Array[Byte]],
-                      val dq: Option[Array[Byte]],
-                      val di: Option[Array[Byte]],
+  class RsaPrivateKey(val n: BigInteger,
+                      val e: BigInteger,
+                      val d: BigInteger,
+                      val p: Option[BigInteger],
+                      val q: Option[BigInteger],
+                      val dp: Option[BigInteger],
+                      val dq: Option[BigInteger],
+                      val qi: Option[BigInteger],
                       val oth: Option[Array[PrimeInfo]],
                       val use: Option[Use],
                       val key_ops: Option[Set[KeyOps]],
@@ -297,21 +298,22 @@ trait JwkToolkit {
   object RsaPrivateKey {
 
     implicit object JPrimeInfo extends JReader[PrimeInfo]{
-      def read(v: JVal): JResult[PrimeInfo] = JSuccess(new PrimeInfo(Base64.decodeBase64((v \ "r").as[String]),
-        Base64.decodeBase64((v \ "d").as[String]),
-        Base64.decodeBase64((v \ "t").as[String])))
+      def read(v: JVal): JResult[PrimeInfo] = JSuccess(
+        new PrimeInfo(new BigInteger(1, Base64.decodeBase64((v \ "r").as[String])),
+          new BigInteger(1, Base64.decodeBase64((v \ "d").as[String])),
+          new BigInteger(1, Base64.decodeBase64((v \ "t").as[String]))))
     }
 
     implicit object JRsaPrivateKeyReader extends JReader[RsaPrivateKey] {
       def read(v: JVal): JResult[RsaPrivateKey] = {
-        JSuccess(new RsaPrivateKey(Base64.decodeBase64((v \ "n").as[String]),
-          Base64.decodeBase64((v \ "e").as[String]),
-          Base64.decodeBase64((v \ "d").as[String]),
-          (v \ "p").asOpt[String].map(Base64.decodeBase64),
-          (v \ "q").asOpt[String].map(Base64.decodeBase64),
-          (v \ "dp").asOpt[String].map(Base64.decodeBase64),
-          (v \ "dq").asOpt[String].map(Base64.decodeBase64),
-          (v \ "di").asOpt[String].map(Base64.decodeBase64),
+        JSuccess(new RsaPrivateKey(new BigInteger(1, Base64.decodeBase64((v \ "n").as[String])),
+          new BigInteger(1, Base64.decodeBase64((v \ "e").as[String])),
+          new BigInteger(1, Base64.decodeBase64((v \ "d").as[String])),
+          (v \ "p").asOpt[String].map(a => new BigInteger(1, Base64.decodeBase64(a))),
+          (v \ "q").asOpt[String].map(a => new BigInteger(1, Base64.decodeBase64(a))),
+          (v \ "dp").asOpt[String].map(a => new BigInteger(1, Base64.decodeBase64(a))),
+          (v \ "dq").asOpt[String].map(a => new BigInteger(1, Base64.decodeBase64(a))),
+          (v \ "qi").asOpt[String].map(a => new BigInteger(1, Base64.decodeBase64(a))),
           (v \ "oth").asOpt[Array[PrimeInfo]],
           (v \ "use").asOpt[Use],
           (v \ "key_ops").asOpt[Array[KeyOps]].map(_.toSet),

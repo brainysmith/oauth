@@ -2,11 +2,9 @@ package com.identityblitz.jwt
 
 import com.identityblitz.utils.json._
 import java.net.URI
-import com.identityblitz.utils.json.JSuccess
 import scala.util.{Failure, Success, Try}
 import javax.security.cert.X509Certificate
 import org.apache.commons.codec.binary.Base64
-import org.apache.commons.codec.binary
 
 trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
 
