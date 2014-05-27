@@ -3,7 +3,7 @@ package com.identityblitz.jwt
 import com.identityblitz.utils.json._
 import java.net.URI
 import scala.util.{Failure, Success, Try}
-import javax.security.cert.X509Certificate
+import java.security.cert.X509Certificate
 import org.apache.commons.codec.binary.Base64
 
 trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
@@ -88,7 +88,24 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     }
   }
 
+  /**
+   * Methods to collect and filter out trying keys.
+   */
 
+  def collectTryingJwk(jws: JWS)(implicit kids: KidsRegister, crypto: CryptoService): Set[JWK] = {
+    val registered = (for (kid <- jws.kid; key <- kids.get(kid)) yield key).toSet
+    val fromJku = (for (jku <- jws.jku) yield downloadJwk(jku)).toSet.flatten
+    //JWK has been skipped because it is not clear how to check its authenticity
+    val fromX5u: Set[JWK] = (for (x5u <- jws.x5u) yield downloadX5c(x5u)).toSet.flatten
+    val fromx5c: Set[JWK] = (for (x5c <- jws.x5c; cert <- crypto.verifyX509CertChain(x5c)) yield JWK(cert)).toSet
+    val all = registered ++ fromJku ++ fromX5u ++ fromx5c
+
+    val filteredByKid = jws.kid.map(id => all.filter(k => k.kid.isEmpty || k.kid.exists(_ == id))).orElse(Option(all)).get
+    jws.x5t.map(hash => filteredByKid.filter(k => k.x5t.isEmpty || k.x5t.exists(_.deep == hash.deep))).orElse(Option(filteredByKid)).get
+  }
+
+  def downloadJwk(url: URI): Set[JWK] = Set.empty
+  def downloadX5c(url: URI): Set[JWK] = Set.empty
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)(null)
 

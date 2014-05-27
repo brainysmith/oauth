@@ -1,7 +1,7 @@
 package com.identityblitz.jwt
 
 import java.net.URI
-import javax.security.cert.X509Certificate
+import java.security.cert.X509Certificate
 import com.identityblitz.utils.json._
 import scala.annotation.implicitNotFound
 import org.apache.commons.codec.binary.Base64
@@ -10,6 +10,8 @@ import scala.util.Success
 import scala.util.Failure
 import com.identityblitz.utils.json.JSuccess
 import java.math.BigInteger
+import java.security.interfaces.{RSAPublicKey => JRSAPublicKey, ECPublicKey => JECPublicKey}
+import com.identityblitz.utils.HashUtils
 
 /**
  *
@@ -140,6 +142,16 @@ trait JwkToolkit {
 
   }
 
+  object JWK {
+
+    def apply(cert: X509Certificate): JWK = cert.getPublicKey match {
+      case rsa: JRSAPublicKey => new RsaPublicKey(rsa.getModulus, rsa.getPublicExponent, None, None, None,
+        None, None, Some(Array(cert)), Some(HashUtils.calcSha1(cert.getEncoded)))
+      case _ => throw new IllegalArgumentException(" certificate with unsupported public key")
+    }
+
+  }
+
   class EcPublicKey(val crv: String,
                     val x: Array[Byte],
                     val y: Array[Byte],
@@ -237,7 +249,11 @@ trait JwkToolkit {
                      val x5c: Option[Array[X509Certificate]],
                      val x5t: Option[Array[Byte]]) extends JWK {
 
-    //add some checks
+    x5c.foreach(a => {
+      val key = a.head.getPublicKey.asInstanceOf[JRSAPublicKey]
+      if(!key.getModulus.equals(n) || !key.getPublicExponent.equals(e))
+        throw new IllegalStateException("JWK public key parameters does not match ones from the corresponding X.509 certificate.")
+    })
 
     val kty: String = "RSA"
 
@@ -288,8 +304,11 @@ trait JwkToolkit {
                       val x5c: Option[Array[X509Certificate]],
                       val x5t: Option[Array[Byte]]) extends JWK {
 
-
-    //add some checks
+    x5c.foreach(a => {
+      val key = a.head.getPublicKey.asInstanceOf[JRSAPublicKey]
+      if(!key.getModulus.equals(n) || !key.getPublicExponent.equals(e))
+        throw new IllegalStateException("JWK private key parameters does not match ones from the corresponding X.509 certificate.")
+    })
 
     val kty: String = "RSA"
 
@@ -396,6 +415,8 @@ trait JwkToolkit {
     def decrypt(alg: String, jwk: JWK, cipherText: Array[Byte]): Array[Byte]
 
     def createX509Cert(der: Array[Byte]): X509Certificate
+
+    def verifyX509CertChain(chain: Array[X509Certificate]): Option[X509Certificate]
 
   }
 

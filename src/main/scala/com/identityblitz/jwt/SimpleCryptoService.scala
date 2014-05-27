@@ -3,7 +3,7 @@ package com.identityblitz.jwt
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.apache.commons.codec.binary.Base64
-import javax.security.cert.X509Certificate
+import java.security.cert.X509Certificate
 import java.security.cert.CertificateFactory
 import java.io.ByteArrayInputStream
 
@@ -40,6 +40,8 @@ trait DefaultCryptoServiceContainer extends JwkToolkit {
       val factory = CertificateFactory.getInstance("X.509")
       factory.generateCertificate(new ByteArrayInputStream(der)).asInstanceOf[X509Certificate]
     }
+
+    def verifyX509CertChain(chain: Array[X509Certificate]): Option[X509Certificate] = ???
   }
 
   implicit val cryptoService = SimpleCrypto
