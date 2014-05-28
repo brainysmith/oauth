@@ -53,6 +53,7 @@ trait SimpleCryptoService extends JwkToolkit {
     }
 
     def verifyX509CertChain(chain: Array[X509Certificate]): Option[X509Certificate] = ???
+
   }
 
   implicit val cryptoService = SimpleCrypto
