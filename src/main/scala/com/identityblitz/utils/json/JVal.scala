@@ -6,7 +6,7 @@ import org.codehaus.jackson.{JsonToken, JsonParser, Version, JsonGenerator}
 import org.codehaus.jackson.map.annotate.JsonCachable
 import org.codehaus.jackson.map.module.SimpleModule
 import org.codehaus.jackson.map.Module.SetupContext
-import java.io.StringWriter
+import java.io.{InputStream, StringWriter}
 import org.codehaus.jackson.map.`type`.TypeFactory
 import scala.collection.mutable
 import scala.collection.generic.CanBuildFrom
@@ -57,7 +57,15 @@ object JVal {
    * @param str - string containing a JSON object.
    * @return - a JSON object
    */
-  def parseStr(str: String): JVal = JacksonBridge.jsonString2JVal(str)
+  def parse(str: String): JVal = JacksonBridge.jsonString2JVal(str)
+
+  /**
+   * Parses input stream containing a JSON object.
+   * @param in - input stream
+   * @return a JSON object
+   */
+  def parse(in: InputStream): JVal = JacksonBridge.jsonString2JVal(in)
+
 }
 
 case object JUndef extends JVal {
@@ -362,6 +370,8 @@ private[json] object JacksonBridge {
 
   private[this] def jsonParser(s: String) = factory.createJsonParser(s)
 
+  private[this] def jsonParser(in: InputStream) = factory.createJsonParser(in)
+
   private[json] def jVal2JsonString(value: JVal): String = {
     val writer = new StringWriter
     mapper.writeValue(generator(writer), value)
@@ -371,6 +381,10 @@ private[json] object JacksonBridge {
 
   private[json] def jsonString2JVal(strJson: String): JVal = {
     mapper.readValue(jsonParser(strJson), classOf[JVal])
+  }
+
+  private[json] def jsonString2JVal(jsonStream: InputStream): JVal = {
+    mapper.readValue(jsonParser(jsonStream), classOf[JVal])
   }
 
 }

@@ -1,9 +1,8 @@
 package com.identityblitz.jwt
 
 import java.lang.System
-import com.identityblitz.utils.json.JVal
 
-object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with DefaultCryptoServiceContainer
+object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with SimpleCryptoService with SimpleKidsRegisterService
 
 object Runner {
 
@@ -52,23 +51,21 @@ object Runner {
 
     System.out.println(jwtHS256)
 
-    val publEc = JVal.parseStr("""{"kty":"EC",
-                      "crv":"P-256",
-                      "x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4",
-                      "y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM",
-                      "use":"enc",
-                      "kid":"1"}""").as[JWK]
+    val strJwtRS256 = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw"
+    val jwtRS256 = JWT[ClaimsSet](strJwtRS256)
 
-    val publRsa = JVal.parseStr("""{"kty":"RSA",
-        "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-        "e":"AQAB",
-        "alg":"RS256",
-        "kid":"2011-04-29"}""").as[JWK]
+    System.out.println(jwtRS256)
 
-    System.out.println("")
+    val jwt4 = builder.alg(RS256).
+      header()
+      .payload(cs(
+      iss % StringOrUri("joe"),
+      exp % IntDate(1300819380),
+      "http://example.com/is_root" % true))
+      .build
 
-
-
+    System.out.println(jwt4)
+    System.out.println(jwt4 asBase64)
 
   }
 

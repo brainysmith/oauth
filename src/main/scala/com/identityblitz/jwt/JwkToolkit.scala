@@ -152,7 +152,7 @@ trait JwkToolkit {
 
   }
 
-  class EcPublicKey(val crv: String,
+  case class EcPublicKey(val crv: String,
                     val x: Array[Byte],
                     val y: Array[Byte],
                     val use: Option[Use],
@@ -195,7 +195,7 @@ trait JwkToolkit {
 
   }
 
-  class EcPrivateKey(val crv: String,
+  case class EcPrivateKey(val crv: String,
                      val x: Array[Byte],
                      val y: Array[Byte],
                      val d: Array[Byte],
@@ -239,7 +239,7 @@ trait JwkToolkit {
 
   }
 
-  class RsaPublicKey(val n: BigInteger,
+  case class RsaPublicKey(val n: BigInteger,
                      val e: BigInteger,
                      val use: Option[Use],
                      val key_ops: Option[Set[KeyOps]],
@@ -283,11 +283,11 @@ trait JwkToolkit {
 
   }
 
-  class PrimeInfo(val r: BigInteger,
+  case class PrimeInfo(val r: BigInteger,
                   val d: BigInteger,
                   val t: BigInteger)
 
-  class RsaPrivateKey(val n: BigInteger,
+  case class RsaPrivateKey(val n: BigInteger,
                       val e: BigInteger,
                       val d: BigInteger,
                       val p: Option[BigInteger],
@@ -352,14 +352,14 @@ trait JwkToolkit {
 
   }
 
-  class SymmetricKey(val k: Array[Byte],
-                     val use: Option[Use],
-                     val key_ops: Option[Set[KeyOps]],
-                     val alg: Option[String],
-                     val kid: Option[String],
-                     val x5u: Option[URI],
-                     val x5c: Option[Array[X509Certificate]],
-                     val x5t: Option[Array[Byte]]) extends JWK {
+  case class SymmetricKey(val k: Array[Byte],
+                     val use: Option[Use] = None,
+                     val key_ops: Option[Set[KeyOps]] = None,
+                     val alg: Option[String] = None,
+                     val kid: Option[String] = None,
+                     val x5u: Option[URI] = None,
+                     val x5c: Option[Array[X509Certificate]] = None,
+                     val x5t: Option[Array[Byte]] = None) extends JWK {
 
 
     //add some checks
@@ -395,11 +395,8 @@ trait JwkToolkit {
     def apply(kid: String): JWK
     def get(kid: String): Option[JWK]
 
-    def curKid(alg: String): JWK
-    def optCurKid(alg: String): Option[JWK]
-
-    def curKid(alg: String, ctx: Map[String, String]): JWK
-    def optCurKid(alg: String, ctx: Map[String, String]): Option[JWK]
+    def defaultKids(alg: String): Seq[JWK]
+    def defaultKids(alg: String, ctx: Map[String, String]): Seq[JWK]
 
   }
 

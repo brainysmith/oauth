@@ -21,43 +21,43 @@ class JsonTest extends FlatSpec with Matchers  {
   behavior of "Checking of JSON deserialization"
 
   it should "deserialization of nested objects ({\"key\":{\"key2\":7}}) " in {
-    JVal.parseStr("{\"key\":{\"key2\":7}}").toJson shouldBe "{\"key\":{\"key2\":7}}"
+    JVal.parse("{\"key\":{\"key2\":7}}").toJson shouldBe "{\"key\":{\"key2\":7}}"
   }
 
   it should "deserialization of pure number (12) " in {
-    JVal.parseStr("12").toJson shouldBe "12"
+    JVal.parse("12").toJson shouldBe "12"
   }
 
   it should "deserialization of pure float number (12.7) " in {
-    JVal.parseStr("12.7").toJson shouldBe "12.7"
+    JVal.parse("12.7").toJson shouldBe "12.7"
   }
 
   it should "deserialization of pure string (\"text\") " in {
-    JVal.parseStr("\"text\"").toJson shouldBe "\"text\""
+    JVal.parse("\"text\"").toJson shouldBe "\"text\""
   }
 
   it should "deserialization of pure boolean (false) " in {
-    JVal.parseStr("false").toJson shouldBe "false"
+    JVal.parse("false").toJson shouldBe "false"
   }
 
   it should "deserialization of pure boolean (true) " in {
-    JVal.parseStr("true").toJson shouldBe "true"
+    JVal.parse("true").toJson shouldBe "true"
   }
 
   it should "deserialization of an object with null field ({\"key\":null}) " in {
-    JVal.parseStr("{\"key\":null}").toJson shouldBe "{\"key\":null}"
+    JVal.parse("{\"key\":null}").toJson shouldBe "{\"key\":null}"
   }
 
   it should "deserialization of an complex object  ({\"key1\":null,\"key2\":7,\"key3\":12.7,\"key4\":\"some text\",\"key5\":true}) " in {
-    JVal.parseStr("{\"key1\":null,\"key2\":7,\"key3\":12.7,\"key4\":\"some text\",\"key5\":true}").toJson shouldBe "{\"key4\":\"some text\",\"key5\":true,\"key1\":null,\"key2\":7,\"key3\":12.7}"
+    JVal.parse("{\"key1\":null,\"key2\":7,\"key3\":12.7,\"key4\":\"some text\",\"key5\":true}").toJson shouldBe "{\"key4\":\"some text\",\"key5\":true,\"key1\":null,\"key2\":7,\"key3\":12.7}"
   }
 
   it should "deserialization of an pure array ([12,\"text\"]) " in {
-    JVal.parseStr("[12, \"text\"]").toJson shouldBe "[12,\"text\"]"
+    JVal.parse("[12, \"text\"]").toJson shouldBe "[12,\"text\"]"
   }
 
   it should "deserialization of an really complex object ({\"key1\":12,\"key2\":\"value2\",\"key3\":true,\"key4\":[10,\"value2\",{\"key\":7}],\"key5\":{\"key6\":17,\"key7\":37},\"key8\":null}) " in {
-    JVal.parseStr("{\"key1\":12,\"key2\":\"value2\",\"key3\":true,\"key4\":[10,\"value2\", {\"key\":7}],\"key5\":{\"key6\":17,\"key7\":37},\"key8\":null}").toJson shouldBe "{\"key4\":[10,\"value2\",{\"key\":7}],\"key5\":{\"key6\":17,\"key7\":37},\"key8\":null,\"key1\":12,\"key2\":\"value2\",\"key3\":true}"
+    JVal.parse("{\"key1\":12,\"key2\":\"value2\",\"key3\":true,\"key4\":[10,\"value2\", {\"key\":7}],\"key5\":{\"key6\":17,\"key7\":37},\"key8\":null}").toJson shouldBe "{\"key4\":[10,\"value2\",{\"key\":7}],\"key5\":{\"key6\":17,\"key7\":37},\"key8\":null,\"key1\":12,\"key2\":\"value2\",\"key3\":true}"
   }
 
   val obj = Json.obj(

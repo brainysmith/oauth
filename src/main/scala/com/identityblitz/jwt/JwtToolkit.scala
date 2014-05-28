@@ -10,7 +10,7 @@ import scala.annotation.implicitNotFound
  * The JSON Web Token (JWT) toolkit is to work with JWT token. The current implementation is based on
  * the JSON Web Token (JWT) draft of version 20 (http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-20).
  */
-trait JwtToolkit {
+trait JwtToolkit extends JwkToolkit {
   self: AlgorithmsKit =>
 
   /**
@@ -19,6 +19,10 @@ trait JwtToolkit {
   trait Algorithm[H <: Header[H], HB] {
 
     val name: String
+
+    val kty: String
+
+    val use: Use.Use
 
     /**
      * Deserializes a string representation of the JWT token and do validating of signature or MAC for JWS tokens and
@@ -240,7 +244,7 @@ trait JwtToolkit {
 
   implicit object claimSetPConverter extends PayloadConverter[ClaimsSet]{
     def toBytes(orig: ClaimsSet): Array[Byte] = orig.asBytes
-    def fromBytes(a: Array[Byte]): ClaimsSet = new ClaimsSet(JVal.parseStr(new String(a, "UTF-8")).as[JObj])
+    def fromBytes(a: Array[Byte]): ClaimsSet = new ClaimsSet(JVal.parse(new String(a, "UTF-8")).as[JObj])
   }
 
   object JWT {
@@ -251,7 +255,7 @@ trait JwtToolkit {
      * @return - JWT instance
      */
     def apply[B](strJWT: String)(implicit pc: PayloadConverter[B]): JWT[_ <: Header[_], B] = {
-      val header = JVal.parseStr(base64ToUtf8String(strJWT.takeWhile(_ != '.'))).as[JObj]
+      val header = JVal.parse(base64ToUtf8String(strJWT.takeWhile(_ != '.'))).as[JObj]
       header("alg").asOpt[String].map(n => self.optByName(n).map( a =>  {
         a.apply[B](header, strJWT)
       }).orElse(throw new IllegalStateException("unknown algorithm ["+ n +"]")))
@@ -303,12 +307,16 @@ abstract class AlgorithmsKit extends JwtToolkit {
    * @return - newly created algorithm.
    */
   protected def Algorithm[H <: Header[H], HB](name: String,
+                                              kty: String,
+                                              use: Use.Use,
                                               ds: (Algorithm[H, HB], JObj, String) => (H, Array[Byte]),
                                               sz: (H, Array[Byte]) => String,
                                               hdrBld: (Algorithm[H, HB]) => HB): Algorithm[H, HB] =
-    new AlgorithmItem[H, HB](name, ds, sz, hdrBld)
+    new AlgorithmItem[H, HB](name, kty, use, ds, sz, hdrBld)
 
   private class AlgorithmItem[H <: Header[H], HB](val name: String,
+                                                  val kty: String,
+                                                  val use: Use.Use,
                                                   val ds: (Algorithm[H, HB], JObj, String) => (H, Array[Byte]),
                                                   val sz: (H, Array[Byte]) => String,
                                                   val hdrBld: (Algorithm[H, HB]) => HB) extends Algorithm[H, HB] {

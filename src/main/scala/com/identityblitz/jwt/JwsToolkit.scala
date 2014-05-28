@@ -5,10 +5,12 @@ import java.net.URI
 import scala.util.{Failure, Success, Try}
 import java.security.cert.X509Certificate
 import org.apache.commons.codec.binary.Base64
+import scala.annotation.tailrec
 
 trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
 
   val cryptoService: CryptoService
+  val kidsRegister: KidsRegister
 
   trait JWSNameKit extends BaseNameKit {
 
@@ -53,7 +55,7 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
 
   val jwtPattern = """^([A-Za-z0-9_-]+\.([A-Za-z0-9_-]+))\.([A-Za-z0-9_-]*)$""".r
 
-  val none = Algorithm[JWS, JWSNoneBuilder]("none",
+  val none = Algorithm[JWS, JWSNoneBuilder]("none","none", Use.sig,
     (alg, hdr, tkn) => {
       jwtPattern findFirstIn tkn match {
         case Some(jwtPattern(_, pl, _)) => (new JWSNone(hdr), Base64.decodeBase64(pl))
@@ -63,49 +65,87 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     new JWSNoneBuilder(_)
   )
 
-  val HS256 = Algorithm[JWS, JWSBuilder]("HS256",
-    deserializeJws(cryptoService),
-    serializeJws,
+  val HS256 = Algorithm[JWS, JWSBuilder]("HS256", "oct", Use.sig,
+    deserializeJws(cryptoService, kidsRegister),
+    serializeJws(kidsRegister),
+    new JWSBuilder(_)
+  )
+
+  val RS256 = Algorithm[JWS, JWSBuilder]("RS256", "RSA", Use.sig,
+    deserializeJws(cryptoService, kidsRegister),
+    serializeJws(kidsRegister),
     new JWSBuilder(_)
   )
 
   def serializeNoneJws(hdr: JWS, pl: Array[Byte]) = hdr.asBase64 + "." + Base64.encodeBase64URLSafeString(pl) + "."
 
-  def serializeJws(hdr: JWS, pl: Array[Byte]) = {
+  def serializeJws(kr: KidsRegister)(hdr: JWS, pl: Array[Byte]) = {
+    implicit val ics = hdr.crypto
+    implicit val ikr = kr
     val hpl = hdr.asBase64 + "." + Base64.encodeBase64URLSafeString(pl)
-    val signature = Base64.encodeBase64URLSafeString(hdr.crypto.sign(hdr.alg.name, null, hpl.getBytes("US-ASCII")))
+    val signature = Base64.encodeBase64URLSafeString(makeSignature(hdr, hpl.getBytes("US-ASCII")))
     hpl + "." + signature
   }
 
-  def deserializeJws(cs: CryptoService)(alg: Algorithm[JWS, _], hdr: JObj, tkn: String) = {
+  def deserializeJws(cs: CryptoService, kr: KidsRegister)(alg: Algorithm[JWS, _], hdr: JObj, tkn: String) = {
+    implicit val ics = cs
+    implicit val ikr = kr
     jwtPattern findFirstIn tkn match {
       case Some(jwtPattern(hpl, pl, s)) =>
-        val jws = new JWS(alg, hdr)(cs)
-        if(!cs.verify(alg.name, null, hpl.getBytes("US-ASCII"),Base64.decodeBase64(s)))
+        val jws = new JWS(alg, hdr)
+        if(!checkSignature(alg.name, collectTryingJwk(jws), hpl.getBytes("US-ASCII"),Base64.decodeBase64(s)))
           throw new IllegalStateException("Signature is wrong.")
         (jws, Base64.decodeBase64(pl))
       case None => throw new IllegalStateException("token has wrong format")
     }
   }
 
+  def checkSignature(alg: String, keys: Seq[JWK], data: Array[Byte], signature: Array[Byte])(implicit cs: CryptoService): Boolean = {
+    @tailrec
+    def core(keys: Seq[JWK]): Boolean = {
+      if(keys.isEmpty) false
+      else if(cs.verify(alg, keys.head, data, signature)) true else core(keys.tail)
+    }
+    core(keys)
+  }
+
   /**
    * Methods to collect and filter out trying keys.
    */
 
-  def collectTryingJwk(jws: JWS)(implicit kids: KidsRegister, crypto: CryptoService): Set[JWK] = {
-    val registered = (for (kid <- jws.kid; key <- kids.get(kid)) yield key).toSet
-    val fromJku = (for (jku <- jws.jku) yield downloadJwk(jku)).toSet.flatten
+  def collectTryingJwk(jws: JWS)(implicit kids: KidsRegister, crypto: CryptoService): Seq[JWK] = {
+    val registered = (for (kid <- jws.kid; key <- kids.get(kid)) yield key).toSeq
+    val fromJku = (for (jku <- jws.jku) yield downloadJwk(jku)).toSeq.flatten
     //JWK has been skipped because it is not clear how to check its authenticity
-    val fromX5u: Set[JWK] = (for (x5u <- jws.x5u) yield downloadX5c(x5u)).toSet.flatten
-    val fromx5c: Set[JWK] = (for (x5c <- jws.x5c; cert <- crypto.verifyX509CertChain(x5c)) yield JWK(cert)).toSet
-    val all = registered ++ fromJku ++ fromX5u ++ fromx5c
+    val fromX5u = (for (x5u <- jws.x5u) yield downloadX5c(x5u)).toSeq.flatten
+    val fromx5c = (for (x5c <- jws.x5c; cert <- crypto.verifyX509CertChain(x5c)) yield JWK(cert)).toSeq
+    val default = kids.defaultKids(jws.alg.name)
+    val all = registered ++ fromJku ++ fromX5u ++ fromx5c ++ default
 
-    val filteredByKid = jws.kid.map(id => all.filter(k => k.kid.isEmpty || k.kid.exists(_ == id))).orElse(Option(all)).get
-    jws.x5t.map(hash => filteredByKid.filter(k => k.x5t.isEmpty || k.x5t.exists(_.deep == hash.deep))).orElse(Option(filteredByKid)).get
+    val filteredByKid = jws.kid.map(id => all.filter(k => k.kid.isEmpty || k.kid.exists(_ == id)))
+      .orElse(Option(all)).get
+    val filteredByX5t = jws.x5t.map(hash => filteredByKid.filter(k => k.x5t.isEmpty || k.x5t.exists(_.deep == hash.deep)))
+      .orElse(Option(filteredByKid)).get
+    filteredByX5t.filter(_.kty == jws.alg.kty).filter(k => k.use.isEmpty || k.use.exists(_ == jws.alg.use)).distinct
   }
 
-  def downloadJwk(url: URI): Set[JWK] = Set.empty
-  def downloadX5c(url: URI): Set[JWK] = Set.empty
+  def downloadJwk(url: URI): Seq[JWK] = Seq.empty
+  def downloadX5c(url: URI): Seq[JWK] = Seq.empty
+
+  def makeSignature(jws: JWS, data: Array[Byte])(implicit kids: KidsRegister, crypto: CryptoService): Array[Byte] =
+    findJwkToSign(jws).map(crypto.sign(jws.alg.name, _, data))
+      .orElse(throw new IllegalStateException("appropriate JWK not found")).get
+
+  def findJwkToSign(jws: JWS)(implicit kids: KidsRegister, crypto: CryptoService): Option[JWK] =
+    jws.kid.flatMap(k => kids.get(k)).orElse(kids.defaultKids(jws.alg.name)
+      .filter(_.kty == jws.alg.kty)
+      .filter(k => k.use.isEmpty || k.use.exists(_ == jws.alg.use))
+      .filter{
+      case _: RsaPrivateKey => true
+      case _: EcPrivateKey => true
+      case _: SymmetricKey => true
+      case _ => false}
+      .find(k => k.key_ops.isEmpty || k.key_ops.exists(_.contains(KeyOps.sign))))
 
   private sealed class JWSNone(private val values: JObj) extends JWS(none, values)(null)
 

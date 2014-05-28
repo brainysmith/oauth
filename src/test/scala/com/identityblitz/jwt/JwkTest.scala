@@ -7,7 +7,7 @@ import java.math.BigInteger
 
 class JwkTest extends FlatSpec with Matchers {
 
-  object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with DefaultCryptoServiceContainer
+  object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with SimpleCryptoService with SimpleKidsRegisterService
   import BaseJwtToolkit._
 
   behavior of "JWK deserialization"
@@ -20,7 +20,7 @@ class JwkTest extends FlatSpec with Matchers {
                       "use":"enc",
                       "kid":"1"}"""
 
-    val ecPubKeyJwk = JVal.parseStr(ecPubKeyJwkStr).as[JWK]
+    val ecPubKeyJwk = JVal.parse(ecPubKeyJwkStr).as[JWK]
 
     ecPubKeyJwk should be (a [EcPublicKey])
     ecPubKeyJwk.kty should be ("EC")
@@ -40,7 +40,7 @@ class JwkTest extends FlatSpec with Matchers {
                               "alg":"RS256",
                               "kid":"2011-04-29"}"""
 
-    val rsaPubKeyJwk = JVal.parseStr(rsaPubKeyJwkStr).as[JWK]
+    val rsaPubKeyJwk = JVal.parse(rsaPubKeyJwkStr).as[JWK]
 
     rsaPubKeyJwk should be (a [RsaPublicKey])
     rsaPubKeyJwk.kty should be ("RSA")
@@ -70,7 +70,7 @@ class JwkTest extends FlatSpec with Matchers {
                               "use":"enc",
                               "kid":"1"}"""
 
-    val ecPrivKeyJwk = JVal.parseStr(ecPrivKeyJwkStr).as[JWK]
+    val ecPrivKeyJwk = JVal.parse(ecPrivKeyJwkStr).as[JWK]
 
     ecPrivKeyJwk should be (a [EcPrivateKey])
     ecPrivKeyJwk.kty should be ("EC")
@@ -98,7 +98,7 @@ class JwkTest extends FlatSpec with Matchers {
                                "alg":"RS256",
                                "kid":"2011-04-29"}"""
 
-    val rsaPrivKeyJwk = JVal.parseStr(rsaPrivKeyJwkStr).as[JWK]
+    val rsaPrivKeyJwk = JVal.parse(rsaPrivKeyJwkStr).as[JWK]
 
     rsaPrivKeyJwk should be (a [RsaPrivateKey])
     rsaPrivKeyJwk.kty should be ("RSA")
@@ -170,7 +170,7 @@ class JwkTest extends FlatSpec with Matchers {
                               "alg":"A128KW",
                               "k":"GawgguFyGrWKav7AX4VKUg"}"""
 
-    val symmetricKey = JVal.parseStr(symmetricKeyStr).as[JWK]
+    val symmetricKey = JVal.parse(symmetricKeyStr).as[JWK]
 
     symmetricKey should be (a [SymmetricKey])
     symmetricKey.kty should be ("oct")
@@ -181,7 +181,7 @@ class JwkTest extends FlatSpec with Matchers {
                       "k":"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow",
                       "kid":"HMAC key used in JWS A.1 example"}"""
 
-    val hmacKey = JVal.parseStr(hmacStr).as[JWK]
+    val hmacKey = JVal.parse(hmacStr).as[JWK]
 
     hmacKey should be (a [SymmetricKey])
     hmacKey.kty should be ("oct")
@@ -200,7 +200,7 @@ class JwkTest extends FlatSpec with Matchers {
                                    "x5c":["MIIDQjCCAiqgAwIBAgIGATz/FuLiMA0GCSqGSIb3DQEBBQUAMGIxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDTzEPMA0GA1UEBxMGRGVudmVyMRwwGgYDVQQKExNQaW5nIElkZW50aXR5IENvcnAuMRcwFQYDVQQDEw5CcmlhbiBDYW1wYmVsbDAeFw0xMzAyMjEyMzI5MTVaFw0xODA4MTQyMjI5MTVaMGIxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDTzEPMA0GA1UEBxMGRGVudmVyMRwwGgYDVQQKExNQaW5nIElkZW50aXR5IENvcnAuMRcwFQYDVQQDEw5CcmlhbiBDYW1wYmVsbDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL64zn8/QnHYMeZ0LncoXaEde1fiLm1jHjmQsF/449IYALM9if6amFtPDy2yvz3YlRij66s5gyLCyO7ANuVRJx1NbgizcAblIgjtdf/u3WG7K+IiZhtELto/A7Fck9Ws6SQvzRvOE8uSirYbgmj6He4iO8NCyvaK0jIQRMMGQwsU1quGmFgHIXPLfnpnfajr1rVTAwtgV5LEZ4Iel+W1GC8ugMhyr4/p1MtcIM42EA8BzE6ZQqC7VPqPvEjZ2dbZkaBhPbiZAS3YeYBRDWm1p1OZtWamT3cEvqqPpnjL1XyW+oyVVkaZdklLQp2Btgt9qr21m42f4wTw+Xrp6rCKNb0CAwEAATANBgkqhkiG9w0BAQUFAAOCAQEAh8zGlfSlcI0o3rYDPBB07aXNswb4ECNIKG0CETTUxmXl9KUL+9gGlqCz5iWLOgWsnrcKcY0vXPG9J1r9AqBNTqNgHq2G03X09266X5CpOe1zFo+Owb1zxtp3PehFdfQJ610CDLEaS9V9Rqp17hCyybEpOGVwe8fnk+fbEL2Bo3UPGrpsHzUoaGpDftmWssZkhpBJKVMJyf/RuP2SmmaIzmnw9JiSlYhzo4tpzd5rFXhjRbg4zW9C+2qok+2+qDM1iJ684gPHMIY8aLWrdgQTxkumGmTqgawR+N5MDtdPTEQ0XfIBc2cJEUyMTY5MPvACWpkA6SdS4xSvdXK3IVfOWA=="]
                                   }"""
 
-    val rsaPubKeyWithCert = JVal.parseStr(rsaPubKeyWithCertStr).as[JWK]
+    val rsaPubKeyWithCert = JVal.parse(rsaPubKeyWithCertStr).as[JWK]
 
   }
 
