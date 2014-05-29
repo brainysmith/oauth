@@ -11,7 +11,11 @@ import scala.util.Failure
 import com.identityblitz.utils.json.JSuccess
 import java.math.BigInteger
 import java.security.interfaces.{RSAPublicKey => JRSAPublicKey, ECPublicKey => JECPublicKey}
-import com.identityblitz.utils.HashUtils
+import com.identityblitz.utils.CryptoUtils
+import java.security.{Key, KeyFactory, PrivateKey, PublicKey}
+import java.security.spec.{RSAPublicKeySpec, RSAPrivateKeySpec}
+import javax.crypto.spec.SecretKeySpec
+import javax.crypto.SecretKey
 
 /**
  *
@@ -140,33 +144,42 @@ trait JwkToolkit {
 
     val x5t: Option[Array[Byte]]
 
+    /**
+     * Handy methods.
+     */
+
+    val unwrapPublicKey: Option[PublicKey] = None
+
+    val unwrapPrivateKey: Option[PrivateKey] = None
+
+    def unwrapSymmetricKey(desiredAlg: String): Option[SecretKey] = None
   }
 
   object JWK {
-
     def apply(cert: X509Certificate): JWK = cert.getPublicKey match {
       case rsa: JRSAPublicKey => new RsaPublicKey(rsa.getModulus, rsa.getPublicExponent, None, None, None,
-        None, None, Some(Array(cert)), Some(HashUtils.calcSha1(cert.getEncoded)))
+        None, None, Some(Array(cert)), Some(CryptoUtils.calcSha1(cert.getEncoded)))
       case _ => throw new IllegalArgumentException(" certificate with unsupported public key")
     }
 
   }
 
-  case class EcPublicKey(val crv: String,
-                    val x: Array[Byte],
-                    val y: Array[Byte],
-                    val use: Option[Use],
-                    val key_ops: Option[Set[KeyOps]],
-                    val alg: Option[String],
-                    val kid: Option[String],
-                    val x5u: Option[URI],
-                    val x5c: Option[Array[X509Certificate]],
-                    val x5t: Option[Array[Byte]]) extends JWK {
+  case class EcPublicKey(crv: String,
+                         x: Array[Byte],
+                         y: Array[Byte],
+                         use: Option[Use] = None,
+                         key_ops: Option[Set[KeyOps]] = None,
+                         alg: Option[String] = None,
+                         kid: Option[String] = None,
+                         x5u: Option[URI] = None,
+                         x5c: Option[Array[X509Certificate]] = None,
+                         x5t: Option[Array[Byte]] = None) extends JWK {
 
     //add some checks
 
     val kty: String = "EC"
 
+    override val unwrapPublicKey = Option(CryptoUtils.genECPublicKey(crv, x, y))
   }
 
   object EcPublicKey {
@@ -195,21 +208,24 @@ trait JwkToolkit {
 
   }
 
-  case class EcPrivateKey(val crv: String,
-                     val x: Array[Byte],
-                     val y: Array[Byte],
-                     val d: Array[Byte],
-                     val use: Option[Use],
-                     val key_ops: Option[Set[KeyOps]],
-                     val alg: Option[String],
-                     val kid: Option[String],
-                     val x5u: Option[URI],
-                     val x5c: Option[Array[X509Certificate]],
-                     val x5t: Option[Array[Byte]]) extends JWK {
+  case class EcPrivateKey(crv: String,
+                          x: Array[Byte],
+                          y: Array[Byte],
+                          d: Array[Byte],
+                          use: Option[Use] = None,
+                          key_ops: Option[Set[KeyOps]] = None,
+                          alg: Option[String] = None,
+                          kid: Option[String] = None,
+                          x5u: Option[URI] = None,
+                          x5c: Option[Array[X509Certificate]] = None,
+                          x5t: Option[Array[Byte]] = None) extends JWK {
 
     //add some checks
 
     val kty: String = "EC"
+
+    override val unwrapPublicKey = Option(CryptoUtils.genECPublicKey(crv, x, y))
+    override val unwrapPrivateKey = Option(CryptoUtils.genECPrivateKey(crv, d))
   }
 
   object EcPrivateKey {
@@ -239,15 +255,15 @@ trait JwkToolkit {
 
   }
 
-  case class RsaPublicKey(val n: BigInteger,
-                     val e: BigInteger,
-                     val use: Option[Use],
-                     val key_ops: Option[Set[KeyOps]],
-                     val alg: Option[String],
-                     val kid: Option[String],
-                     val x5u: Option[URI],
-                     val x5c: Option[Array[X509Certificate]],
-                     val x5t: Option[Array[Byte]]) extends JWK {
+  case class RsaPublicKey(n: BigInteger,
+                          e: BigInteger,
+                          use: Option[Use] = None,
+                          key_ops: Option[Set[KeyOps]] = None,
+                          alg: Option[String] = None,
+                          kid: Option[String] = None,
+                          x5u: Option[URI] = None,
+                          x5c: Option[Array[X509Certificate]] = None,
+                          x5t: Option[Array[Byte]] = None) extends JWK {
 
     x5c.foreach(a => {
       val key = a.head.getPublicKey.asInstanceOf[JRSAPublicKey]
@@ -257,6 +273,7 @@ trait JwkToolkit {
 
     val kty: String = "RSA"
 
+    override val unwrapPublicKey = Option(KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(n, e)))
   }
 
   object RsaPublicKey {
@@ -283,26 +300,26 @@ trait JwkToolkit {
 
   }
 
-  case class PrimeInfo(val r: BigInteger,
-                  val d: BigInteger,
-                  val t: BigInteger)
+  case class PrimeInfo(r: BigInteger,
+                       d: BigInteger,
+                       t: BigInteger)
 
-  case class RsaPrivateKey(val n: BigInteger,
-                      val e: BigInteger,
-                      val d: BigInteger,
-                      val p: Option[BigInteger],
-                      val q: Option[BigInteger],
-                      val dp: Option[BigInteger],
-                      val dq: Option[BigInteger],
-                      val qi: Option[BigInteger],
-                      val oth: Option[Array[PrimeInfo]],
-                      val use: Option[Use],
-                      val key_ops: Option[Set[KeyOps]],
-                      val alg: Option[String],
-                      val kid: Option[String],
-                      val x5u: Option[URI],
-                      val x5c: Option[Array[X509Certificate]],
-                      val x5t: Option[Array[Byte]]) extends JWK {
+  case class RsaPrivateKey(n: BigInteger,
+                           e: BigInteger,
+                           d: BigInteger,
+                           p: Option[BigInteger] = None,
+                           q: Option[BigInteger] = None,
+                           dp: Option[BigInteger] = None,
+                           dq: Option[BigInteger] = None,
+                           qi: Option[BigInteger] = None,
+                           oth: Option[Array[PrimeInfo]] = None,
+                           use: Option[Use] = None,
+                           key_ops: Option[Set[KeyOps]] = None,
+                           alg: Option[String] = None,
+                           kid: Option[String] = None,
+                           x5u: Option[URI] = None,
+                           x5c: Option[Array[X509Certificate]] = None,
+                           x5t: Option[Array[Byte]] = None) extends JWK {
 
     x5c.foreach(a => {
       val key = a.head.getPublicKey.asInstanceOf[JRSAPublicKey]
@@ -312,6 +329,8 @@ trait JwkToolkit {
 
     val kty: String = "RSA"
 
+    override val unwrapPublicKey = Option(KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(n, e)))
+    override val unwrapPrivateKey = Option(KeyFactory.getInstance("RSA").generatePrivate(new RSAPrivateKeySpec(n, d)))
   }
 
   object RsaPrivateKey {
@@ -352,20 +371,21 @@ trait JwkToolkit {
 
   }
 
-  case class SymmetricKey(val k: Array[Byte],
-                     val use: Option[Use] = None,
-                     val key_ops: Option[Set[KeyOps]] = None,
-                     val alg: Option[String] = None,
-                     val kid: Option[String] = None,
-                     val x5u: Option[URI] = None,
-                     val x5c: Option[Array[X509Certificate]] = None,
-                     val x5t: Option[Array[Byte]] = None) extends JWK {
+  case class SymmetricKey(k: Array[Byte],
+                          use: Option[Use] = None,
+                          key_ops: Option[Set[KeyOps]] = None,
+                          alg: Option[String] = None,
+                          kid: Option[String] = None,
+                          x5u: Option[URI] = None,
+                          x5c: Option[Array[X509Certificate]] = None,
+                          x5t: Option[Array[Byte]] = None) extends JWK {
 
 
     //add some checks
 
     val kty: String = "oct"
 
+    override def unwrapSymmetricKey(desiredAlg: String): Option[SecretKey] = Option(new SecretKeySpec(k, desiredAlg))
   }
 
   object SymmetricKey {
@@ -405,7 +425,9 @@ trait JwkToolkit {
 
     def sign(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
 
-    def verify(alg: String, jwk: JWK, plainText: Array[Byte], signature: Array[Byte]): Boolean
+    def sign(desiredAlg: String, key: Key, plainText: Array[Byte]): Array[Byte]
+
+    def verify(desiredAlg: String, key: Key, plainText: Array[Byte], signature: Array[Byte]): Boolean
 
     def encrypt(alg: String, jwk: JWK, plainText: Array[Byte]): Array[Byte]
 
