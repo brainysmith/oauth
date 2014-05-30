@@ -63,10 +63,17 @@ trait JwtToolkit extends JwkToolkit {
   }
 
   abstract class NameKit {
+    thisKit =>
+
+    private val aMap: mutable.Map[String, Name[_]] = new mutable.HashMap
+
+    val names: Set[String] = aMap.keySet.to[Set]
 
     def Name[A](name: String, validator: (A) => Unit)(implicit writer: JWriter[A]): Name[A] = new NameImpl[A](name, validator)
 
     private class NameImpl[A](val name: String, val validator: (A) => Unit)(implicit writer: JWriter[A]) extends Name[A] {
+      thisKit.aMap(name) = this
+
       def % (a: A): (String, JVal) = {
         validator(a)
         (name, Json.toJson(a))
@@ -87,7 +94,7 @@ trait JwtToolkit extends JwkToolkit {
 
     def checkIfEmptyArray(name: String)(value: Array[_]) = {
       if(value.isEmpty)
-        throw new IllegalArgumentException(value + " list is empty")
+        throw new IllegalArgumentException(value.toSeq + " list is empty")
     }
 
     /**

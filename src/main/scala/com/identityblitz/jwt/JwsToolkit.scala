@@ -29,10 +29,28 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
 
   object JWSNameKit extends JWSNameKit
 
+  private def notAllowedCritNames = Set("typ", "cty", "jku", "jwk", "kid", "x5u", "x5c", "x5t", "crit")
+
+  def extensionsNames: Set[String] = Set.empty
+
   /**
    * This traits is represents JWS header.
    */
   class JWS(val alg: Algorithm[JWS, _], values: JObj)(implicit val crypto: CryptoService) extends Header[JWS] {
+    val crit: Option[Array[String]] = values(JWSNameKit.crit.name).asOpt[Array[String]]
+
+    if(crit.exists(_.isEmpty))
+      throw new IllegalStateException("[crit] Header parameter is empty.")
+
+    if(crit.exists(a => a.toSet.size != a.length))
+      throw new IllegalStateException("[crit] Header parameter contains duplicates.")
+
+    if(crit.exists(_.toSet.diff(extensionsNames).nonEmpty))
+      throw new IllegalArgumentException("[crit] Header parameter contains unsupported parameters.")
+
+    if(crit.exists(_.filter(notAllowedCritNames.contains).nonEmpty))
+      throw new IllegalStateException("[crit] Header parameter contains names defined by JWS or JWA specifications.")
+
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
@@ -41,8 +59,10 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     val kid: Option[String] = values(JWSNameKit.kid.name).asOpt[String]
     val x5u: Option[URI] = values(JWSNameKit.x5u.name).asOpt[URI]
     val x5c: Option[Array[X509Certificate]] = values(JWSNameKit.x5c.name).asOpt[Array[X509Certificate]]
+
+    val crit2: Option[Array[String]] = values(JWSNameKit.crit.name).asOpt[Array[String]]
+
     val x5t: Option[Array[Byte]] = values(JWSNameKit.x5t.name).asOpt[Array[Byte]]
-    val crit: Option[Array[String]] = values(JWSNameKit.crit.name).asOpt[Array[String]]
 
 
 
@@ -73,42 +93,78 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     new JWSNoneBuilder(_)
   )
 
-  def vHmacSHA256(key: JWK, plainText: Array[Byte], mac: Array[Byte], cs: CryptoService): Boolean =
-    key.unwrapSymmetricKey("HmacSHA256").fold(false)(k => cs.verify("HmacSHA256", k, plainText, mac))
+  def vHmacSHA256(desiredAlg: String)(key: JWK, plainText: Array[Byte], mac: Array[Byte], cs: CryptoService): Boolean =
+    key.unwrapSymmetricKey(desiredAlg).fold(false)(k => cs.verify(desiredAlg, k, plainText, mac))
 
-  def sHmacSHA256(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
-    key.unwrapSymmetricKey("HmacSHA256")
-      .fold[Array[Byte]](throw new IllegalStateException("symmetric key is undefined"))(k => cs.sign("HmacSHA256", k, plainText))
+  def sHmacSHA256(desiredAlg: String)(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
+    key.unwrapSymmetricKey(desiredAlg)
+      .fold[Array[Byte]](throw new IllegalStateException("symmetric key is undefined"))(k => cs.sign(desiredAlg, k, plainText))
 
   val HS256 = Algorithm[JWS, JWSBuilder]("HS256", "oct", Use.sig,
-    deserializeJws(vHmacSHA256)(cryptoService, kidsRegister),
-    serializeJws(sHmacSHA256)(kidsRegister),
+    deserializeJws(vHmacSHA256("HmacSHA256"))(cryptoService, kidsRegister),
+    serializeJws(sHmacSHA256("HmacSHA256"))(kidsRegister),
     new JWSBuilder(_)
   )
 
-  def vSHA256withRSA(key: JWK, plainText: Array[Byte], signature: Array[Byte], cs: CryptoService): Boolean =
-    key.unwrapPublicKey.fold(false)(k => cs.verify("SHA256withRSA", k, plainText, signature))
+  val HS384 = Algorithm[JWS, JWSBuilder]("HS384", "oct", Use.sig,
+    deserializeJws(vHmacSHA256("HmacSHA384"))(cryptoService, kidsRegister),
+    serializeJws(sHmacSHA256("HmacSHA384"))(kidsRegister),
+    new JWSBuilder(_)
+  )
 
-  def sSHA256withRSA(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
+  val HS512 = Algorithm[JWS, JWSBuilder]("HS512", "oct", Use.sig,
+    deserializeJws(vHmacSHA256("HmacSHA512"))(cryptoService, kidsRegister),
+    serializeJws(sHmacSHA256("HmacSHA512"))(kidsRegister),
+    new JWSBuilder(_)
+  )
+
+  def vSHAwithRSA(desiredAlg: String)(key: JWK, plainText: Array[Byte], signature: Array[Byte], cs: CryptoService): Boolean =
+    key.unwrapPublicKey.fold(false)(k => cs.verify(desiredAlg, k, plainText, signature))
+
+  def sSHAwithRSA(desiredAlg: String)(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
     key.unwrapPrivateKey
-      .fold[Array[Byte]](throw new IllegalStateException("private key is undefined"))(k => cs.sign("SHA256withRSA", k, plainText))
+      .fold[Array[Byte]](throw new IllegalStateException("private key is undefined"))(k => cs.sign(desiredAlg, k, plainText))
 
   val RS256 = Algorithm[JWS, JWSBuilder]("RS256", "RSA", Use.sig,
-    deserializeJws(vSHA256withRSA)(cryptoService, kidsRegister),
-    serializeJws(sSHA256withRSA)(kidsRegister),
+    deserializeJws(vSHAwithRSA("SHA256withRSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithRSA("SHA256withRSA"))(kidsRegister),
     new JWSBuilder(_)
   )
 
-  def vSHA256withECDSA(key: JWK, plainText: Array[Byte], signature: Array[Byte], cs: CryptoService): Boolean =
-    key.unwrapPublicKey.fold(false)(k => cs.verify("SHA256withECDSA", k, plainText, CryptoUtils.encodeECSignature(signature)))
+  val RS384 = Algorithm[JWS, JWSBuilder]("RS384", "RSA", Use.sig,
+    deserializeJws(vSHAwithRSA("SHA384withRSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithRSA("SHA384withRSA"))(kidsRegister),
+    new JWSBuilder(_)
+  )
 
-  def sSHA256withECDSA(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
+  val RS512 = Algorithm[JWS, JWSBuilder]("RS512", "RSA", Use.sig,
+    deserializeJws(vSHAwithRSA("SHA512withRSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithRSA("SHA512withRSA"))(kidsRegister),
+    new JWSBuilder(_)
+  )
+
+  def vSHAwithECDSA(desiredAlg: String)(key: JWK, plainText: Array[Byte], signature: Array[Byte], cs: CryptoService): Boolean =
+    key.unwrapPublicKey.fold(false)(k => cs.verify(desiredAlg, k, plainText, CryptoUtils.encodeECSignature(signature)))
+
+  def sSHAwithECDSA(desiredAlg: String)(key: JWK, plainText: Array[Byte], cs: CryptoService): Array[Byte] =
     key.unwrapPrivateKey
-      .fold[Array[Byte]](throw new IllegalStateException("private key is undefined"))(k => CryptoUtils.decodeECSignature(cs.sign("SHA256withECDSA", k, plainText)))
+      .fold[Array[Byte]](throw new IllegalStateException("private key is undefined"))(k => CryptoUtils.decodeECSignature(cs.sign(desiredAlg, k, plainText)))
 
   val ES256 = Algorithm[JWS, JWSBuilder]("ES256", "EC", Use.sig,
-    deserializeJws(vSHA256withECDSA)(cryptoService, kidsRegister),
-    serializeJws(sSHA256withECDSA)(kidsRegister),
+    deserializeJws(vSHAwithECDSA("SHA256withECDSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithECDSA("SHA256withECDSA"))(kidsRegister),
+    new JWSBuilder(_)
+  )
+
+  val ES384 = Algorithm[JWS, JWSBuilder]("ES384", "EC", Use.sig,
+    deserializeJws(vSHAwithECDSA("SHA384withECDSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithECDSA("SHA384withECDSA"))(kidsRegister),
+    new JWSBuilder(_)
+  )
+
+  val ES512 = Algorithm[JWS, JWSBuilder]("ES512", "EC", Use.sig,
+    deserializeJws(vSHAwithECDSA("SHA512withECDSA"))(cryptoService, kidsRegister),
+    serializeJws(sSHAwithECDSA("SHA512withECDSA"))(kidsRegister),
     new JWSBuilder(_)
   )
 

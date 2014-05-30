@@ -2,14 +2,16 @@ package com.identityblitz.jwt
 
 import java.lang.System
 
-object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with SimpleCryptoService with SimpleKidsRegisterService
+object BaseJwtToolkit extends AlgorithmsKit with JwsToolkit with SimpleCryptoService with SimpleKidsRegisterService {
+  override def extensionsNames: Set[String] = Set("exp")
+}
 
 object Runner {
 
   def main(args: Array[String]) {
     import BaseJwtToolkit._
 
-    val plainJwt = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
+    /*val plainJwt = "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
 
     val jwt = JWT[ClaimsSet](plainJwt)
 
@@ -18,11 +20,11 @@ object Runner {
 
     System.out.println(jwt.payload.iss.get)
     System.out.println(jwt.payload.exp.get)
-    System.out.println(jwt.payload.names)
+    System.out.println(jwt.payload.names)*/
 
-    import BaseNameKit._
+    import JWSNameKit._
 
-    val jwt2 =  builder.alg(none)
+    /*val jwt2 =  builder.alg(none)
       .header(typ % "JWT")
       .payload(cs(
       iss % StringOrUri("joe"),
@@ -85,6 +87,32 @@ object Runner {
 
     val jwtES256Check = JWT[ClaimsSet](jwt5 asBase64)
     System.out.println("Check passed!")
+
+
+
+    val strJwtES512 = "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn"
+
+    implicit object stringPConverter extends PayloadConverter[String]{
+      def toBytes(orig: String): Array[Byte] = orig.getBytes("UTF-8")
+      def fromBytes(a: Array[Byte]): String = new String(a, "UTF-8")
+    }
+    val jwtES512 = JWT[String](strJwtES512)
+
+    System.out.println(jwtES512.payload)*/
+
+
+
+
+    val jwt6 = builder.alg(ES256).
+      header(
+        typ % "JWT",
+        crit % Array("exp")
+      )
+      .payload(cs(
+      iss % StringOrUri("joe"),
+      exp % IntDate(1300819380),
+      "http://example.com/is_root" % true))
+      .build
 
   }
 

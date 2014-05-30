@@ -29,8 +29,12 @@ object CryptoUtils {
   }
 
   def encodeECSignature(join: Array[Byte]) = {
-    val r = new BigInteger(1, join.take(32))
-    val s = new BigInteger(1, join.takeRight(32))
+    if(join.length % 2 != 0)
+      throw new IllegalStateException("incorrect EC signature format")
+
+    val plen = join.length >> 1
+    val r = new BigInteger(1, join.take(plen))
+    val s = new BigInteger(1, join.takeRight(plen))
     val v: ASN1EncodableVector = new ASN1EncodableVector
     v.add(new DERInteger(r))
     v.add(new DERInteger(s))
@@ -39,11 +43,18 @@ object CryptoUtils {
 
   def decodeECSignature(encoded: Array[Byte]) = {
     val seq = ASN1Primitive.fromByteArray(encoded).asInstanceOf[ASN1Sequence]
-    val r = seq.getObjectAt(0).asInstanceOf[DERInteger].getValue.toByteArray.dropWhile(_ == 0)
-      .reverse.padTo(32, 0x00.toByte).reverse
-    val s = seq.getObjectAt(1).asInstanceOf[DERInteger].getValue.toByteArray.dropWhile(_ == 0)
-      .reverse.padTo(32, 0x00.toByte).reverse
-    r ++ s
+    val rb = seq.getObjectAt(0).asInstanceOf[DERInteger].getValue.toByteArray.dropWhile(_ == 0)
+    val sb = seq.getObjectAt(1).asInstanceOf[DERInteger].getValue.toByteArray.dropWhile(_ == 0)
+
+    if(rb.length > 48 || sb.length > 48) {
+      rb.reverse.padTo(66, 0x00.toByte).reverse ++ sb.reverse.padTo(66, 0x00.toByte).reverse
+    }
+    else if(rb.length > 32 || sb.length > 32) {
+      rb.reverse.padTo(48, 0x00.toByte).reverse ++ sb.reverse.padTo(48, 0x00.toByte).reverse
+    }
+    else {
+      rb.reverse.padTo(32, 0x00.toByte).reverse ++ sb.reverse.padTo(32, 0x00.toByte).reverse
+    }
   }
 
 }

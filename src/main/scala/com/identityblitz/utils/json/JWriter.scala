@@ -29,10 +29,7 @@ trait DefaultJWriters {
   }
 
   implicit def arrayJWriter[T](implicit writer: JWriter[T]): JWriter[Array[T]] = new JWriter[Array[T]] {
-    def write(o: Array[T]): JVal = o match {
-      case Array(s) => Json.toJson(s)(writer)
-      case a @ _ => JArr(o.map(t => Json.toJson(t)(writer)))
-    }
+    def write(o: Array[T]): JVal = JArr(o.map(t => Json.toJson(t)(writer)))
   }
 
   implicit def mapJWriter[T](implicit writer: JWriter[T]): JWriter[Map[String, T]] = new JWriter[Map[String, T]] {
@@ -44,7 +41,10 @@ trait DefaultJWriters {
   }
 
   implicit def traversableJWriter[T : JWriter] = new JWriter[Traversable[T]] {
-    def write(o: Traversable[T]): JVal = JArr(o.map(Json.toJson(_)).toArray)
+    def write(o: Traversable[T]): JVal = o match {
+      case s if s.size == 1 => Json.toJson(s.head)
+      case t @ _ => JArr(t.map(Json.toJson(_)).toArray)
+    }
   }
 
   implicit def optionJWrite[T : JWriter] = new JWriter[Option[T]] {
