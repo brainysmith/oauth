@@ -51,6 +51,9 @@ trait JwsToolkit extends AlgorithmsKit with JwtToolkit with JwkToolkit {
     if(crit.exists(_.filter(notAllowedCritNames.contains).nonEmpty))
       throw new IllegalStateException("[crit] Header parameter contains names defined by JWS or JWA specifications.")
 
+    if(crit.exists(_.toSet.diff(values.fields).nonEmpty))
+      throw new IllegalStateException("[crit] Header parameter contains names that are absent among headers names.")
+
     val typ: Option[String] = values(BaseNameKit.typ.name).asOpt[String]
     val cty: Option[String] = values(BaseNameKit.cty.name).asOpt[String]
 
