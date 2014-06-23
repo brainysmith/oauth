@@ -32,6 +32,8 @@ trait AuthzReq extends OReq {
     throw new OAuthException("invalid_client", "Unknown client", state)
   }
 
+  clientId.authenticate(this)
+
   /*
   The redirection endpoint URI MUST be an absolute URI as defined by
   [RFC3986] Section 4.3.  The endpoint URI MAY include an
@@ -56,6 +58,10 @@ trait AuthzReq extends OReq {
 
   private val supResponseTypes: Set[String] = Set("code", "token") ++ extResponseTypes
 
+  /*
+  Returns extended supported response types. This method is intended to be
+  overridden in descendants.
+  */
   protected def extResponseTypes: Set[String] = Set()
 
 }
@@ -69,7 +75,10 @@ trait AcsTknReq extends OReq {
 /**
  * The access token request used in authorization code grant.
  */
-trait CodeAcsTknReq extends OReq {
+trait CodeAcsTknReq extends AcsTknReq {
+
+  if(grantType != "authorization_code")
+    throw new OAuthException("invalid_grant", "authorization grant must be \"authorization_code\"")
 
   /*
   The authorization code received from the authorization server.
@@ -80,12 +89,19 @@ trait CodeAcsTknReq extends OReq {
   The redirect URI, if the "redirect_uri" parameter was included in the
   authorization request as described in Section 4.1.1, and their values MUST be identical.
   */
-  val redirectUri: Option[URI] = get("redirect_uri").map(new URI(_))
+  val redirectUri: Option[URI] = get("redirect_uri").flatMap(u => Try(new URI(u)).recoverWith {
+    case e: URISyntaxException => throw new OAuthException("invalid_request", "Wrong redirect uri")
+    case o => throw o
+  }.toOption)
 
   /*
   The client id if the client is not authenticating with the authorization server as described in Section 3.2.1.
   */
-  val clientId: Option[String] = get("client_id")
+  val clientId: Option[Client] = get("client_id").flatMap(Client byId _ orElse{
+    throw new OAuthException("invalid_client", "Unknown client")
+  })
+
+  clientId.foreach(_.authenticate(this))
 
 }
 
