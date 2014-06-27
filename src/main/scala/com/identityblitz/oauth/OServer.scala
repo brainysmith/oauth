@@ -6,8 +6,8 @@ trait OServer[Req, Resp] {
 
   val responseTypeHandlers: Map[Set[String], Handler]
 
-  def authorizationEndpoint(req: Req)(implicit reqConverter: AReqConverter[Req],
-                                      respConverter: RespConverter[Resp]): Resp = {
+  def ea(req: Req)(implicit reqConverter: AReqConverter[Req],
+                   respConverter: RespConverter[Resp]): Resp = {
     respConverter.convert(
       Try{
         val oreq = reqConverter.convert(req)

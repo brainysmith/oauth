@@ -17,6 +17,12 @@ trait ORequests {
 
   }
 
+  /**
+   * An external request to be used in an external module which is used to interact to an end-user.
+   * For example to ask an end-user to log in or to consent to the requested permissions.
+   */
+  trait ExtReq extends OReq
+
   trait AuthzReq extends OReq {
 
     /*
