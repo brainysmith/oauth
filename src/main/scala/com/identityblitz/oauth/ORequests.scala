@@ -21,7 +21,10 @@ trait ORequests {
    * An external request to be used in an external module which is used to interact to an end-user.
    * For example to ask an end-user to log in or to consent to the requested permissions.
    */
-  trait ExtReq extends OReq
+  case class ExtReq(private val store: Map[String, String]) extends OReq{
+    def apply(name: String): String = store(name)
+    def get(name: String): Option[String] = store.get(name)
+  }
 
   trait AuthzReq extends OReq {
 
