@@ -15,6 +15,8 @@ trait ORequests {
 
     def get(name: String): Option[String]
 
+    val responseType: Set[String]
+
   }
 
   /**
@@ -24,6 +26,7 @@ trait ORequests {
   case class ExtReq(private val store: Map[String, String]) extends OReq{
     def apply(name: String): String = store(name)
     def get(name: String): Option[String] = store.get(name)
+    val responseType: Set[String] = apply("response_type").split(" ").toSet
   }
 
   trait AuthzReq extends OReq {
@@ -147,7 +150,7 @@ trait ORequests {
   /**
    * The access token request used in client credential grant
    */
-  trait ClientCredAcsTkn extends AcsTknReq {
+  trait ClientCredAcsTknReq extends AcsTknReq {
 
     /*
     The scope of the access request as described by Section 3.3.
