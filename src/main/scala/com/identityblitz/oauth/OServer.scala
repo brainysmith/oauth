@@ -6,7 +6,9 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
 
   val responseTypeHandlers: Map[Set[String], Handler]
 
-  def ea(req: Req)(implicit reqConverter: AReqConverter,
+  val grantTypeHandlers: Map[String, Handler]
+
+  def ea(req: Req)(implicit reqConverter: ZReqConverter,
                    respConverter: RespConverter): Resp = _ea(reqConverter.convert(req))
 
   /**
@@ -35,8 +37,28 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
     }
   }
 
-  trait AReqConverter {
+  def te(req: Req)(implicit reqConverter: AReqConverter,
+                   respConverter: RespConverter): Resp = {
+    val oreq = reqConverter.convert(req)
+    respConverter.convert(Try{
+      grantTypeHandlers.get(oreq.grantType).map(_.handle(oreq)).orElse(
+        Option(ErrorResp("unsupported_response_type",
+          """The authorization server does not support obtaining an
+            |access token using this method."""))
+      ).get
+    } match {
+      case Success(r) => r
+      case Failure(e: OAuthException) => ErrorResp(e)
+      case Failure(e) => ErrorResp("server_error", e.getMessage)
+    })
+  }
+
+  trait ZReqConverter {
     def convert(in: Req): AuthzReq
+  }
+
+  trait AReqConverter {
+    def convert(in: Req): AcsTknReq
   }
 
   trait RespConverter {

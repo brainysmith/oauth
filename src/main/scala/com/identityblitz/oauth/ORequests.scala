@@ -130,6 +130,9 @@ trait ORequests {
    */
   trait ResOwnerPaswdCredAcsTknReq extends AcsTknReq {
 
+    if(grantType != "password")
+      throw new OAuthException("invalid_grant", "authorization grant must be \"password\"")
+
     /*
     The resource owner username.
     */
@@ -151,6 +154,9 @@ trait ORequests {
    * The access token request used in client credential grant
    */
   trait ClientCredAcsTknReq extends AcsTknReq {
+
+    if(grantType != "client_credentials")
+      throw new OAuthException("invalid_grant", "authorization grant must be \"client_credentials\"")
 
     /*
     The scope of the access request as described by Section 3.3.
