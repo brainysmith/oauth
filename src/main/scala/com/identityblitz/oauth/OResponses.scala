@@ -4,13 +4,11 @@ import com.identityblitz.utils.json.{JWriter, JStr, JObj}
 import java.net.URI
 import org.apache.commons.codec.net.URLCodec
 
-trait OResponses {
+trait OResponses extends ORequests {
 
   trait OResp {
 
-    def apply(name: String): String
-
-    def get(name: String): Option[String]
+    def param(name: String): Option[String]
 
 
     /**
@@ -29,9 +27,9 @@ trait OResponses {
 
   trait AuthzResp extends OResp {
 
-    val code: String = apply("code")
+    val code: String = param("code").get
 
-    val state: Option[String] = get("state")
+    val state: Option[String] = param("state")
 
     override def asQueryString = new URLCodec("US-ASCII").encode(state.foldLeft("?code=" + code)(mp("&state=")(_, _)))
 
@@ -45,13 +43,13 @@ trait OResponses {
 
   trait AcsTknResp extends OResp {
 
-    val accessToken: String = apply("access_token")
+    val accessToken: String = param("access_token").get
 
-    val tokenType: String = apply("token_type")
+    val tokenType: String = param("token_type").get
 
-    val expiresIn: Option[Long] = get("expires_in").map(_.toLong)
+    val expiresIn: Option[Long] = param("expires_in").map(_.toLong)
 
-    val scope: Option[String] = get("scope")
+    val scope: Option[String] = param("scope")
 
 
   }
@@ -62,7 +60,7 @@ trait OResponses {
 
   trait CodeAcsTknResp extends AcsTknResp {
 
-    val refreshToken: Option[String] = get("refresh_token")
+    val refreshToken: Option[String] = param("refresh_token")
 
     def asQueryString: String = throw new UnsupportedOperationException
 
@@ -83,7 +81,7 @@ trait OResponses {
 
   trait ImplicitAcsTknResp extends AcsTknResp {
 
-    val state: Option[String] = get("state")
+    val state: Option[String] = param("state")
 
     override def asQueryString = new URLCodec("US-ASCII").encode(scope.foldLeft(
       state.foldLeft(
@@ -116,36 +114,18 @@ trait OResponses {
   trait ClientCredAcsTknResp extends CodeAcsTknResp
 
   /**
-   * External response
-   */
-
-  case class ExtResp(private val store: Map[String, String]) extends OResp {
-
-    def apply(name: String): String = store(name)
-
-    def get(name: String): Option[String] = store.get(name)
-
-    /**
-     * Serialization methods.
-     */
-    def asQueryString: String = ???
-
-    def asJson: JObj = ???
-  }
-
-  /**
    * Error response
    */
 
   trait ErrorResp extends OResp {
 
-    val error: String = apply("error")
+    val error: String = param("error").get
 
-    val error_description: Option[String] = get("error_description")
+    val error_description: Option[String] = param("error_description")
 
-    val error_uri: Option[URI] = get("error_uri").map(new URI(_))
+    val error_uri: Option[URI] = param("error_uri").map(new URI(_))
 
-    val state: Option[String] = get("state")
+    val state: Option[String] = param("state")
 
     override def asQueryString = new URLCodec("US-ASCII").encode(state.foldLeft(
       error_uri.map(_.toString).foldLeft(
@@ -163,24 +143,40 @@ trait OResponses {
 
   object ErrorResp {
     def apply(e: OAuthException): ErrorResp = new ErrorResp {
-      def get(name: String): Option[String] = name match {
+      def param(name: String): Option[String] = name match {
         case "error" => Option(e.error)
         case "error_description" => e.errorDescription
         case "error_uri" => e.errorUri.map(_.toString)
         case "state" => e.state
         case _ => None
       }
-      def apply(name: String): String = get(name).get
     }
 
     def apply(err: String, err_desc: String): ErrorResp = new ErrorResp {
-      def get(name: String): Option[String] = Map("error" -> err, "error_description" -> err_desc).get(name)
-      def apply(name: String): String = get(name).get
+      def param(name: String): Option[String] = Map("error" -> err, "error_description" -> err_desc).get(name)
     }
   }
 
   private def mp(n: String)(a: String, b: String): String = a + "&" + n + "=" + b
 
   private def jmp[T](n: String)(a: JObj, b: T)(implicit jw: JWriter[T]): JObj = a + (n, b)
+
+  /**
+   * Interaction response
+   */
+
+  trait InteractionResp extends OResp {
+
+    val authzReq: AuthzReq
+
+    def param(name: String): Option[String] = ???
+
+    /**
+     * Serialization methods.
+     */
+    def asQueryString: String = ???
+
+    def asJson: JObj = ???
+  }
 
 }
