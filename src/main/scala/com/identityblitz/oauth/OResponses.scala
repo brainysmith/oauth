@@ -10,7 +10,6 @@ trait OResponses extends ORequests {
 
     def param(name: String): Option[String]
 
-
     /**
      * Serialization methods.
      */
@@ -27,7 +26,8 @@ trait OResponses extends ORequests {
 
   trait AuthzResp extends OResp {
 
-    val code: String = param("code").get
+    val code: String = param("code")
+      .getOrElse(throw new OAuthException("invalid_response", "Undefined code"))
 
     val state: Option[String] = param("state")
 
@@ -43,9 +43,11 @@ trait OResponses extends ORequests {
 
   trait AcsTknResp extends OResp {
 
-    val accessToken: String = param("access_token").get
+    val accessToken: String = param("access_token")
+      .getOrElse(throw new OAuthException("invalid_response", "Undefined access token"))
 
-    val tokenType: String = param("token_type").get
+    val tokenType: String = param("token_type")
+      .getOrElse(throw new OAuthException("invalid_response", "Undefined token type"))
 
     val expiresIn: Option[Long] = param("expires_in").map(_.toLong)
 
@@ -119,7 +121,8 @@ trait OResponses extends ORequests {
 
   trait ErrorResp extends OResp {
 
-    val error: String = param("error").get
+    val error: String = param("error")
+      .getOrElse(throw new OAuthException("invalid_response", "Undefined error"))
 
     val error_description: Option[String] = param("error_description")
 
