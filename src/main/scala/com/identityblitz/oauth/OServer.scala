@@ -2,14 +2,18 @@ package com.identityblitz.oauth
 
 import scala.util.{Failure, Success, Try}
 
-trait OServer[Req, Resp] extends OResponses with ORequests {
+trait OServer[Req, Resp] extends Handlers {
 
   val responseTypeHandlers: Map[Set[String], Handler]
 
   val grantTypeHandlers: Map[String, Handler]
 
   def ea(req: Req)(implicit reqConverter: ZReqConverter[Req],
-                   respConverter: RespConverter[Resp]): Resp = _ea(reqConverter.convert(req))
+                   respConverter: RespConverter[Resp]): Resp = Try(_ea(reqConverter.convert(req))) match {
+    case Success(r) => r
+    case Failure(e: OAuthException) => respConverter.convert(ErrorResp(e))
+    case Failure(e) => respConverter.convert(ErrorResp("server_error", e.getMessage))
+  }
 
   /**
    * The function is intended to be implemented in final server object to give the possibility of switching
@@ -20,6 +24,7 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
    */
   def goToUserInteraction(resp: InteractionResp): Resp
 
+  //TODO rewrite completely
   def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter[Resp]): Resp = _ea(req.authzReq)
 
   private def _ea(req: AuthzReq)(implicit respConverter: RespConverter[Resp]): Resp = {
@@ -51,10 +56,6 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
       case Failure(e: OAuthException) => ErrorResp(e)
       case Failure(e) => ErrorResp("server_error", e.getMessage)
     })
-  }
-
-  trait Handler {
-    def handle(req: OReq): OResp
   }
 
 }

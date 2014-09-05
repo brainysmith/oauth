@@ -8,6 +8,8 @@ import scala.annotation.implicitNotFound
 
 trait OResponses extends ORequests {
 
+  private val uc = new URLCodec("US-ASCII")
+
   trait OResp {
 
     def param(name: String): Option[String]
@@ -33,7 +35,7 @@ trait OResponses extends ORequests {
 
     val state: Option[String] = param("state")
 
-    override def asQueryString = new URLCodec("US-ASCII").encode(state.foldLeft("?code=" + code)(mp("&state=")(_, _)))
+    override def asQueryString = state.foldLeft("?code=" + uc.encode(code))(mp("&state=")(_, _))
 
     override def asJson = state.foldLeft(JObj("code" -> JStr(code)))(jmp("state")(_, _))
 
@@ -86,13 +88,13 @@ trait OResponses extends ORequests {
 
     val state: Option[String] = param("state")
 
-    override def asQueryString = new URLCodec("US-ASCII").encode(scope.map(_.mkString(" ")).foldLeft(
+    override def asQueryString = scope.map(_.mkString(" ")).foldLeft(
       state.foldLeft(
         expiresIn.map(_.toString).foldLeft(
-          "?access_token=" + accessToken + "&token_type=" + tokenType
+          "?access_token=" + uc.encode(accessToken) + "&token_type=" + uc.encode(tokenType)
         )(mp("expires_in")(_, _))
       )(mp("state")(_, _))
-    )(mp("scope")(_, _)))
+    )(mp("scope")(_, _))
 
     override def asJson = scope.map(_.mkString(" ")).foldLeft(
       state.foldLeft(
@@ -131,11 +133,11 @@ trait OResponses extends ORequests {
 
     val state: Option[String] = param("state")
 
-    override def asQueryString = new URLCodec("US-ASCII").encode(state.foldLeft(
+    override def asQueryString = state.foldLeft(
       errorUri.map(_.toString).foldLeft(
-        errorDescription.foldLeft("?error=" + error)(mp("error_description")(_, _))
+        errorDescription.foldLeft("?error=" + uc.encode(error))(mp("error_description")(_, _))
       )(mp("&error_uri=")(_, _))
-    )(mp("&state=")(_, _)))
+    )(mp("&state=")(_, _))
 
     override def asJson = state.foldLeft(
       errorUri.map(_.toString).foldLeft(
@@ -161,7 +163,7 @@ trait OResponses extends ORequests {
     }
   }
 
-  private def mp(n: String)(a: String, b: String): String = a + "&" + n + "=" + b
+  private def mp(n: String)(a: String, b: String): String = a + "&" + n + "=" + uc.encode(b)
 
   private def jmp[T](n: String)(a: JObj, b: T)(implicit jw: JWriter[T]): JObj = a + (n, b)
 
@@ -182,9 +184,9 @@ trait OResponses extends ORequests {
     /**
      * Serialization methods.
      */
-    def asQueryString: String = new URLCodec("US-ASCII").encode("?authz_req=" + authzReq.serialize +
-      "&authn_reqd=" + authnRequired +
-      "&consent_reqd=" + consentRequired)
+    def asQueryString: String = "?authz_req=" + uc.encode(authzReq.serialize) +
+      "&authn_reqd=" + uc.encode(authnRequired) +
+      "&consent_reqd=" + uc.encode(consentRequired)
 
     def asJson: JObj = JObj(Seq("authz_req" -> JStr(authzReq.serialize),
       "authn_reqd" -> JBool(authnRequired),

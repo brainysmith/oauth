@@ -11,8 +11,6 @@ trait ORequests {
 
   val clientStore: ClientStore
 
-  val authnService: AuthenticationService
-
   trait OReq {
 
     def param(name: String): Option[String]
@@ -36,6 +34,8 @@ trait ORequests {
     val responseType: Set[String] = param("response_type").map(_.split(" ").toSet)
       .getOrElse(throw new OAuthException("invalid_request", "Response type not found", state))
 
+    private val supResponseTypes: Set[String] = Set("code", "token") ++ extResponseTypes
+
     if(!responseType.subsetOf(supResponseTypes))
       throw new OAuthException("invalid_request", "Found unsupported response type", state)
 
@@ -43,8 +43,9 @@ trait ORequests {
     The unique string representing the registration
     information provided by the client.
     */
-    val clientId: Client = param("client_id").flatMap(clientStore.byId)
-      .getOrElse(throw new OAuthException("invalid_client", "Unknown client", state))
+    val clientId: Client = param("client_id")
+      .map(id => clientStore.byId(id).getOrElse(throw new OAuthException("invalid_client", "Unknown client " + id + ".", state)))
+      .getOrElse(throw new OAuthException("invalid_client", "Undefined client.", state))
 
     clientId.authenticate(this) match {
       case Right(_) =>
@@ -72,8 +73,6 @@ trait ORequests {
     additional access range to the requested scope.
     */
     val scope: Option[Set[String]] = param("scope").map(s => s.split(" ").toSet)
-
-    private val supResponseTypes: Set[String] = Set("code", "token") ++ extResponseTypes
 
     /*
     Returns extended supported response types. This method is intended to be
