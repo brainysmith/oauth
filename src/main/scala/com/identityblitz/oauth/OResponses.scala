@@ -1,8 +1,10 @@
 package com.identityblitz.oauth
 
-import com.identityblitz.utils.json.{JWriter, JStr, JObj}
+import com.identityblitz.utils.json.{JBool, JWriter, JStr, JObj}
 import java.net.URI
 import org.apache.commons.codec.net.URLCodec
+
+import scala.annotation.implicitNotFound
 
 trait OResponses extends ORequests {
 
@@ -165,21 +167,38 @@ trait OResponses extends ORequests {
   private def jmp[T](n: String)(a: JObj, b: T)(implicit jw: JWriter[T]): JObj = a + (n, b)
 
   /**
-   * Interaction response
+   * Interaction response to run user interactive mode to do user authentication or/and get its consent.
    */
 
-  trait InteractionResp extends OResp {
+  case class InteractionResp(authzReq: AuthzReq,
+                             authnRequired: Boolean = false,
+                             consentRequired: Boolean = false) extends OResp {
 
-    val authzReq: AuthzReq
-
-    def param(name: String): Option[String] = ???
+    def param(name: String): Option[String] = name match {
+      case "authz_req" => Some(authzReq.serialize)
+      case "authn_reqd" => Some(authnRequired.toString)
+      case "consent_reqd" => Some(consentRequired.toString)
+    }
 
     /**
      * Serialization methods.
      */
-    def asQueryString: String = ???
+    def asQueryString: String = new URLCodec("US-ASCII").encode("?authz_req=" + authzReq.serialize +
+      "&authn_reqd=" + authnRequired +
+      "&consent_reqd=" + consentRequired)
 
-    def asJson: JObj = ???
+    def asJson: JObj = JObj(Seq("authz_req" -> JStr(authzReq.serialize),
+      "authn_reqd" -> JBool(authnRequired),
+      "consent_reqd" -> JBool(consentRequired)))
+  }
+
+  /**
+   * Converters from oauth requests.
+   */
+
+  @implicitNotFound("No OAuth 2.0 response converter found for type ${Resp}. Try to implement an implicit RespConverter.")
+  trait RespConverter[Resp] {
+    def convert(res: OResp): Resp
   }
 
 }

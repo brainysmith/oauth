@@ -1,8 +1,10 @@
 package com.identityblitz.oauth
 
 import java.net.{URISyntaxException, URI}
-import com.identityblitz.utils.json.JObj
+import com.identityblitz.utils.json.{JVal, Json, JObj}
+import org.apache.commons.codec.binary.Base64
 
+import scala.annotation.implicitNotFound
 import scala.util.Try
 
 trait ORequests {
@@ -79,19 +81,18 @@ trait ORequests {
     */
     protected def extResponseTypes: Set[String] = Set()
 
-    def serialize: String
+    final def serialize: String = Base64.encodeBase64URLSafeString(iSerialize.toJson.getBytes("UTF-8"))
+
+    /**
+     * Serializes this request to [[JObj]]. Intended to be overridden by the implementation.
+     * @return
+     */
+    def iSerialize: JObj
 
   }
 
   object AuthzReq {
-
-    def apply(serialized: String): AuthzReq = new AuthzReq {
-      private val store: Map[String, String] = ???
-      override def param(name: String): Option[String] = store.get(name);
-
-      override def serialize: String = ???
-    }
-
+    def apply[Req](serialized: String)(implicit rc: ZReqConverter[Req]): AuthzReq = rc.convert(serialized)
   }
 
   trait AcsTknReq extends OReq {
@@ -174,15 +175,44 @@ trait ORequests {
   }
 
   /**
-   * Interaction response
+   * Interaction request to go on to fulfill the authorization request, processing of which requires user interaction.
    */
 
-  trait InteractionReq extends OReq {
+  case class InteractionReq(authzReq: AuthzReq,
+                            succeeded: Boolean,
+                            exception: OAuthException) extends OReq {
 
-    val authzReq: AuthzReq
-
-    def param(name: String): Option[String] = ???
+    def param(name: String): Option[String] = name match {
+      case "authz_req" => Some(authzReq.serialize)
+      case "succeeded" => Some(succeeded.toString)
+      case "exception" => Some(exception.toString) //hack
+    }
 
   }
+
+  /**
+   * Converters into authorization or access requests.
+   */
+
+  @implicitNotFound("No authorization request converter found for type ${Req}. Try to implement an implicit ZReqConverter.")
+  trait ZReqConverter[Req] {
+    def convert(in: Req): AuthzReq
+    def convert(in: JObj): AuthzReq
+
+    /**
+     * Deserializes an authorization request from string representation obtained from call to
+     * the serialization method, <i>AuthzReq.serialization</i>.
+     * @param in
+     * @return
+     */
+    final def convert(in: String): AuthzReq = convert(JVal.parse(new String(Base64.decodeBase64(in), "UTF-8")).as[JObj])
+  }
+
+  @implicitNotFound("No access request converter found for type ${Req}. Try to implement an implicit AReqConverter.")
+  trait AReqConverter[Req] {
+    def convert(in: Req): AcsTknReq
+  }
+
+
 
 }

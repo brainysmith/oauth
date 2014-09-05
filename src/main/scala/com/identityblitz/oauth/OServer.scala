@@ -8,8 +8,8 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
 
   val grantTypeHandlers: Map[String, Handler]
 
-  def ea(req: Req)(implicit reqConverter: ZReqConverter,
-                   respConverter: RespConverter): Resp = _ea(reqConverter.convert(req))
+  def ea(req: Req)(implicit reqConverter: ZReqConverter[Req],
+                   respConverter: RespConverter[Resp]): Resp = _ea(reqConverter.convert(req))
 
   /**
    * The function is intended to be implemented in final server object to give the possibility of switching
@@ -20,9 +20,9 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
    */
   def goToUserInteraction(resp: InteractionResp): Resp
 
-  def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter): Resp = _ea(req.authzReq)
+  def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter[Resp]): Resp = _ea(req.authzReq)
 
-  private def _ea(req: AuthzReq)(implicit respConverter: RespConverter): Resp = {
+  private def _ea(req: AuthzReq)(implicit respConverter: RespConverter[Resp]): Resp = {
     Try{
       responseTypeHandlers.get(req.responseType).map(_.handle(req)).orElse(
         Option(ErrorResp("unsupported_response_type",
@@ -37,8 +37,8 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
     }
   }
 
-  def te(req: Req)(implicit reqConverter: AReqConverter,
-                   respConverter: RespConverter): Resp = {
+  def te(req: Req)(implicit reqConverter: AReqConverter[Req],
+                   respConverter: RespConverter[Resp]): Resp = {
     val oreq = reqConverter.convert(req)
     respConverter.convert(Try{
       grantTypeHandlers.get(oreq.grantType).map(_.handle(oreq)).orElse(
@@ -51,18 +51,6 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
       case Failure(e: OAuthException) => ErrorResp(e)
       case Failure(e) => ErrorResp("server_error", e.getMessage)
     })
-  }
-
-  trait ZReqConverter {
-    def convert(in: Req): AuthzReq
-  }
-
-  trait AReqConverter {
-    def convert(in: Req): AcsTknReq
-  }
-
-  trait RespConverter {
-    def convert(res: OResp): Resp
   }
 
   trait Handler {
