@@ -18,11 +18,11 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
    *             by the user interaction interface.
    * @return - user interaction interface.
    */
-  def goToUserInteraction(resp: ExtResp): Resp
+  def goToUserInteraction(resp: InteractionResp): Resp
 
-  def returnFromUserInteraction(req: ExtReq)(implicit respConverter: RespConverter): Resp = _ea(req)
+  def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter): Resp = _ea(req.authzReq)
 
-  private def _ea(req: OReq)(implicit respConverter: RespConverter): Resp = {
+  private def _ea(req: AuthzReq)(implicit respConverter: RespConverter): Resp = {
     Try{
       responseTypeHandlers.get(req.responseType).map(_.handle(req)).orElse(
         Option(ErrorResp("unsupported_response_type",
@@ -30,7 +30,7 @@ trait OServer[Req, Resp] extends OResponses with ORequests {
             |access token using this method."""))
       ).get
     } match {
-      case Success(r: ExtResp) => goToUserInteraction(r)
+      case Success(ir: InteractionResp) => goToUserInteraction(ir)
       case Success(r) => respConverter.convert(r)
       case Failure(e: OAuthException) => respConverter.convert(ErrorResp(e))
       case Failure(e) => respConverter.convert(ErrorResp("server_error", e.getMessage))
