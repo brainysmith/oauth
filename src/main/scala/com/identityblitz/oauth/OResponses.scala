@@ -53,8 +53,7 @@ trait OResponses extends ORequests {
 
     val expiresIn: Option[Long] = param("expires_in").map(_.toLong)
 
-    val scope: Option[String] = param("scope")
-
+    val scope: Option[Set[String]] = param("scope").map(s => s.split(" ").toSet)
 
   }
 
@@ -87,7 +86,7 @@ trait OResponses extends ORequests {
 
     val state: Option[String] = param("state")
 
-    override def asQueryString = new URLCodec("US-ASCII").encode(scope.foldLeft(
+    override def asQueryString = new URLCodec("US-ASCII").encode(scope.map(_.mkString(" ")).foldLeft(
       state.foldLeft(
         expiresIn.map(_.toString).foldLeft(
           "?access_token=" + accessToken + "&token_type=" + tokenType
@@ -95,7 +94,7 @@ trait OResponses extends ORequests {
       )(mp("state")(_, _))
     )(mp("scope")(_, _)))
 
-    override def asJson = scope.foldLeft(
+    override def asJson = scope.map(_.mkString(" ")).foldLeft(
       state.foldLeft(
         expiresIn.map(_.toString).foldLeft(
           JObj("access_token" -> JStr(accessToken)) +
@@ -126,21 +125,21 @@ trait OResponses extends ORequests {
     val error: String = param("error")
       .getOrElse(throw new OAuthException("invalid_response", "Undefined error"))
 
-    val error_description: Option[String] = param("error_description")
+    val errorDescription: Option[String] = param("error_description")
 
-    val error_uri: Option[URI] = param("error_uri").map(new URI(_))
+    val errorUri: Option[URI] = param("error_uri").map(new URI(_))
 
     val state: Option[String] = param("state")
 
     override def asQueryString = new URLCodec("US-ASCII").encode(state.foldLeft(
-      error_uri.map(_.toString).foldLeft(
-        error_description.foldLeft("?error=" + error)(mp("error_description")(_, _))
+      errorUri.map(_.toString).foldLeft(
+        errorDescription.foldLeft("?error=" + error)(mp("error_description")(_, _))
       )(mp("&error_uri=")(_, _))
     )(mp("&state=")(_, _)))
 
     override def asJson = state.foldLeft(
-      error_uri.map(_.toString).foldLeft(
-        error_description.foldLeft(JObj("error" -> JStr(error)))(jmp("error_description")(_, _))
+      errorUri.map(_.toString).foldLeft(
+        errorDescription.foldLeft(JObj("error" -> JStr(error)))(jmp("error_description")(_, _))
       )(jmp("error_uri")(_, _))
     )(jmp("state")(_, _))
 
@@ -157,8 +156,8 @@ trait OResponses extends ORequests {
       }
     }
 
-    def apply(err: String, err_desc: String): ErrorResp = new ErrorResp {
-      def param(name: String): Option[String] = Map("error" -> err, "error_description" -> err_desc).get(name)
+    def apply(err: String, errDesc: String): ErrorResp = new ErrorResp {
+      def param(name: String): Option[String] = Map("error" -> err, "error_description" -> errDesc).get(name)
     }
   }
 

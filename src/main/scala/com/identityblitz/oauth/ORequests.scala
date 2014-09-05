@@ -100,11 +100,11 @@ trait ORequests {
     val grantType: String = param("grant_type")
       .getOrElse(throw new OAuthException("invalid_grant", "Undefined grant type"))
 
-    val clientId: Client = param("client_id")
-      .fold(authnService.authenticate(this))(clientStore.byId(_)
-      .toRight(new OAuthException("invalid_client", "Unknown client")).right.map(_.authenticate(this)).joinRight
-      ) match {
-      case Right(c) => c
+    val clientId: Client = param("client_id").flatMap(clientStore.byId)
+      .getOrElse(throw new OAuthException("invalid_client", "Unknown client"))
+
+    clientId.authenticate(this) match {
+      case Right(_) =>
       case Left(e) => throw e
     }
 
