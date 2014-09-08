@@ -2,11 +2,11 @@ package com.identityblitz.oauth
 
 import scala.util.{Failure, Success, Try}
 
-trait OServer[Req, Resp] extends Handlers {
+trait OServer[Req, Resp] extends OAuthErrors {
 
-  val responseTypeHandlers: Map[Set[String], Handler]
+  val responseTypeHandlers: Map[Set[String], PartialFunction[OReq, OResp]]
 
-  val grantTypeHandlers: Map[String, Handler]
+  val grantTypeHandlers: Map[String, PartialFunction[OReq, OResp]]
 
   def ea(req: Req)(implicit reqConverter: ZReqConverter[Req],
                    respConverter: RespConverter[Resp]): Resp = Try(_ea(reqConverter.convert(req))) match {
@@ -24,15 +24,15 @@ trait OServer[Req, Resp] extends Handlers {
    */
   def goToUserInteraction(resp: InteractionResp): Resp
 
-  //TODO rewrite completely
-  def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter[Resp]): Resp = _ea(req.authzReq)
+  def returnFromUserInteraction(req: InteractionReq)(implicit respConverter: RespConverter[Resp]): Resp = _ea(req)
 
-  private def _ea(req: AuthzReq)(implicit respConverter: RespConverter[Resp]): Resp = {
+  private def _ea(req: OReq)(implicit respConverter: RespConverter[Resp]): Resp = {
     Try{
-      responseTypeHandlers.get(req.responseType).map(_.handle(req)).orElse(
-        Option(ErrorResp("unsupported_response_type",
-          """The authorization server does not support obtaining an
-            |access token using this method."""))
+      responseTypeHandlers.get((req match {
+        case a: AuthzReq => a
+        case i: InteractionReq => i.authzReq
+      }).responseType).map(_.applyOrElse(req, server_error("Got wrong type."))).orElse(
+        Option(unsupported_response_type("unsupported response type")(req))
       ).get
     } match {
       case Success(ir: InteractionResp) => goToUserInteraction(ir)
@@ -46,10 +46,8 @@ trait OServer[Req, Resp] extends Handlers {
                    respConverter: RespConverter[Resp]): Resp = {
     val oreq = reqConverter.convert(req)
     respConverter.convert(Try{
-      grantTypeHandlers.get(oreq.grantType).map(_.handle(oreq)).orElse(
-        Option(ErrorResp("unsupported_response_type",
-          """The authorization server does not support obtaining an
-            |access token using this method."""))
+      grantTypeHandlers.get(oreq.grantType).map(_(oreq)).orElse(
+        Option(invalid_grant("Got wrong grant type.")(oreq))
       ).get
     } match {
       case Success(r) => r

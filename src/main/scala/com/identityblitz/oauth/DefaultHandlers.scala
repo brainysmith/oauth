@@ -2,8 +2,8 @@ package com.identityblitz.oauth
 
 trait DefaultHandlers extends Handlers {
 
-  val responseTypeHandlers: Map[Set[String], Handler] = Map()
+  val responseTypeHandlers: Map[Set[String], PartialFunction[OReq, OResp]] = Map()
 
-  val grantTypeHandlers: Map[String, Handler] = Map()
+  val grantTypeHandlers: Map[String, PartialFunction[OReq, OResp]] = Map()
 
 }

@@ -161,6 +161,15 @@ trait OResponses extends ORequests {
     def apply(err: String, errDesc: String): ErrorResp = new ErrorResp {
       def param(name: String): Option[String] = Map("error" -> err, "error_description" -> errDesc).get(name)
     }
+
+    def apply(err: String, errDesc: String, state: Option[String]): ErrorResp = new ErrorResp {
+      def param(name: String): Option[String] = name match {
+        case "error" => Some(err)
+        case "error_description" => Some(errDesc)
+        case "state" => state
+        case _ => None
+      }
+    }
   }
 
   private def mp(n: String)(a: String, b: String): String = a + "&" + n + "=" + uc.encode(b)
