@@ -33,18 +33,17 @@ sealed trait JResult[+T] {
 
 trait Applicative
 
-trait Applicative3[A1, A2, A3] extends Applicative {
-  def apply[T](f: (A1, A2, A3) => T): JResult[T]
+case class Applicative2[A1, A2](t: JResult[(A1, A2)]) extends Applicative {
+  def lift[T](f: (A1, A2) => T): JResult[T] = t map f.tupled
+}
+case class Applicative3[A1, A2, A3](t: JResult[(A1, A2, A3)]) extends Applicative {
+  def lift[T](f: (A1, A2, A3) => T): JResult[T] = t map f.tupled
+}
+case class Applicative4[A1, A2, A3, A4](t: JResult[(A1, A2, A3, A4)]) extends Applicative {
+  def lift[T](f: (A1, A2, A3, A4) => T): JResult[T] = t map f.tupled
 }
 
-object Applicative {
-  def apply[A1, A2, A3](t: JResult[(A1, A2, A3)]) = new Applicative3[A1, A2, A3] {
-    override def apply[T](f: (A1, A2, A3) => T): JResult[T] = t match {
-      case JSuccess(v) => JSuccess(f(v._1, v._2, v._3))
-      case e: JError => e
-    }
-  }
-}
+import scala.language.implicitConversions
 
 object JsonTools {
   implicit def jBuilder1[A1, A2](a1: JResult[A1], a2: JResult[A2]) = (a1, a2) match {
@@ -61,7 +60,16 @@ object JsonTools {
     case (JError(v1), JError(v2)) => JError(v1 ++ v2)
   }
 
-  implicit def applicative3[A1, A2, A3] = Applicative.apply[A1, A2, A3] _
+  implicit def jBuilder3[A1, A2, A3, A4](a: JResult[(A1, A2, A3)], b: JResult[A4]) = (a, b) match {
+    case (JSuccess(v1), JSuccess(v2)) => JSuccess((v1._1, v1._2, v1._3, v2))
+    case (JError(v), JSuccess(_)) => JError(v)
+    case (JSuccess(_), JError(v)) => JError(v)
+    case (JError(v1), JError(v2)) => JError(v1 ++ v2)
+  }
+
+  implicit def applicative2[A1, A2](t: JResult[(A1, A2)]) = Applicative2(t)
+  implicit def applicative3[A1, A2, A3](t: JResult[(A1, A2, A3)]) = Applicative3(t)
+  implicit def applicative4[A1, A2, A3, A4](t: JResult[(A1, A2, A3, A4)]) = Applicative4(t)
 }
 
 import JsonTools._
@@ -78,7 +86,7 @@ object Test {
     override def read(v: JVal): JResult[Test] =
       ((v \ "id").read[String] and
         (v \ "num").read[Int] and
-        (v \ "act").read[Boolean] $).apply(Test.apply)
+        (v \ "act").read[Boolean] $).lift(Test.apply)
 
   }
 
