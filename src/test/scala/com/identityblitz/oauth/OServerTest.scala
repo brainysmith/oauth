@@ -8,11 +8,9 @@ class OServerTest extends FlatSpec with Matchers {
 
   case class StringWrapper(value: String)
 
-  object TestOServer extends OServer[StringWrapper, String] with DefaultHandlers {
+  object TestOServer extends OServer[StringWrapper, String] with DefaultHandlers with DefaultClientStore {
 
     override def goToUserInteraction(resp: InteractionResp): String = ???
-
-    override val clientStore: ClientStore = new ClientStore {}
 
     case class SimpleAuthzReq(private val store: Map[String, String]) extends AuthzReq {
       override def param(name: String): Option[String] = store.get(name)

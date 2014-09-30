@@ -6,7 +6,7 @@ import org.apache.commons.codec.net.URLCodec
 
 import scala.annotation.implicitNotFound
 
-trait OResponses extends ORequests {
+trait OResponses extends ORequests with ClientStore {
 
   private val uc = new URLCodec("US-ASCII")
 

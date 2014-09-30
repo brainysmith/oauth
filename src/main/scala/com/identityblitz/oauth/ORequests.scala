@@ -8,8 +8,7 @@ import scala.annotation.implicitNotFound
 import scala.util.Try
 
 trait ORequests {
-
-  val clientStore: ClientStore
+  self: ClientStore =>
 
   trait OReq {
 
@@ -44,7 +43,7 @@ trait ORequests {
     information provided by the client.
     */
     val clientId: Client = param("client_id")
-      .map(id => clientStore.byId(id).getOrElse(throw new OAuthException("invalid_client", "Unknown client " + id + ".", state)))
+      .map(id => byClientId(id).getOrElse(throw new OAuthException("invalid_client", "Unknown client " + id + ".", state)))
       .getOrElse(throw new OAuthException("invalid_client", "Undefined client.", state))
 
     clientId.authenticate(this) match {
@@ -99,7 +98,7 @@ trait ORequests {
     val grantType: String = param("grant_type")
       .getOrElse(throw new OAuthException("invalid_grant", "Undefined grant type"))
 
-    val clientId: Client = param("client_id").flatMap(clientStore.byId)
+    val clientId: Client = param("client_id").flatMap(byClientId)
       .getOrElse(throw new OAuthException("invalid_client", "Unknown client"))
 
     clientId.authenticate(this) match {

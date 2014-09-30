@@ -204,6 +204,16 @@ class JsonTest extends FlatSpec with Matchers  {
     (arr :+ 7).toJson shouldBe "[10,\"test\",true,7]"
   }
 
+  val objTTest = Json.obj(
+    "id" -> "new",
+    "num" -> 7,
+    "act" -> true
+  )
+
+  val jTest = objTTest.as[Test]
+
+  System.out.println(jTest)
+
 
 
 

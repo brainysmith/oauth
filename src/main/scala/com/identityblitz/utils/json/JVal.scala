@@ -48,6 +48,8 @@ trait JVal {
    */
   def asOpt[T](implicit reader: JReader[T]): Option[T] = reader.read(this).fold[Option[T]](_ => None)(v => Option(v))
 
+  def read[T](implicit reader: JReader[T]): JResult[T] = reader.read(this)
+
 }
 
 object JVal {
