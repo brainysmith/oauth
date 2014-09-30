@@ -210,9 +210,80 @@ class JsonTest extends FlatSpec with Matchers  {
     "act" -> true
   )
 
-  val jTest = objTTest.as[Test]
+  import JsonTools._
+  import scala.language.postfixOps
 
-  System.out.println(jTest)
+  case class Test1(x: String) {
+    override def toString: String = "Test(x = " + x + ")"
+  }
+
+  object Test1 {
+    implicit def jreader = new JReader[Test1] {
+      override def read(v: JVal): JResult[Test1] =
+        ((v \ "id").read[String] $).lift(Test1.apply)
+
+    }
+  }
+
+  case class Test2(x: String, y: Int) {
+    override def toString: String = "Test(x = " + x + ", y = " + y + ")"
+  }
+
+  object Test2 {
+    implicit def jreader = new JReader[Test2] {
+      override def read(v: JVal): JResult[Test2] =
+        ((v \ "id").read[String] and
+          (v \ "num").read[Int] $).lift(Test2.apply)
+
+    }
+  }
+
+  case class Test3(x: String, y: Int, z: Boolean) {
+    override def toString: String = "Test(x = " + x + ", y = " + y + ", z = " + z + ")"
+  }
+
+  object Test3 {
+    implicit def jreader = new JReader[Test3] {
+      override def read(v: JVal): JResult[Test3] =
+        ((v \ "id").read[String] and
+          (v \ "num").read[Int] and
+          (v \ "act").read[Boolean] $).lift(Test3.apply)
+
+    }
+  }
+
+  val jTest1 = objTTest.as[Test1]
+  val jTest2 = objTTest.as[Test2]
+  val jTest3 = objTTest.as[Test3]
+
+  System.out.println(jTest1)
+  System.out.println(jTest2)
+  System.out.println(jTest3)
+
+  val objWoOptTest = Json.obj(
+    "id" -> "new"
+  )
+
+  val objOptTest = Json.obj(
+    "id" -> "new",
+    "num" -> "My Name"
+  )
+  
+  case class TestOpt(id: String, name: Option[String]) {
+    override def toString: String = "Test(id = " + id + ", name = " + name + ")"
+  }
+
+  object TestOpt {
+    implicit def jreader = new JReader[TestOpt] {
+      override def read(v: JVal): JResult[TestOpt] =
+        ((v \ "id").read[String] and
+          (v \ "num").read[Option[String]] $).lift(TestOpt.apply)
+
+    }
+  }
+
+  System.out.println(objWoOptTest.as[TestOpt])
+  System.out.println(objOptTest.as[TestOpt])
 
 
 
