@@ -204,89 +204,94 @@ class JsonTest extends FlatSpec with Matchers  {
     (arr :+ 7).toJson shouldBe "[10,\"test\",true,7]"
   }
 
-  val objTTest = Json.obj(
-    "id" -> "new",
-    "num" -> 7,
-    "act" -> true
+  val sub = Json.obj(
+    "id" -> 193,
+    "login" -> "jon",
+    "trusted" -> true
   )
 
   import JsonTools._
   import scala.language.postfixOps
 
-  case class Test1(x: String) {
-    override def toString: String = "Test(x = " + x + ")"
+  case class SimpleSubject(id: Int) {
+    override def toString: String = "SimpleSubject(id = " + id + ")"
   }
 
-  object Test1 {
-    implicit def jreader = new JReader[Test1] {
-      override def read(v: JVal): JResult[Test1] =
-        ((v \ "id").read[String] $).lift(Test1.apply)
+  object SimpleSubject {
+    implicit def jreader = new JReader[SimpleSubject] {
+      override def read(v: JVal): JResult[SimpleSubject] =
+        ((v \ "id").read[Int] $).lift(SimpleSubject.apply)
 
     }
   }
 
-  case class Test2(x: String, y: Int) {
-    override def toString: String = "Test(x = " + x + ", y = " + y + ")"
+  case class Subject(id: Int, login: String) {
+    override def toString: String = "Subject(id = " + id + ", login = " + login + ")"
   }
 
-  object Test2 {
-    implicit def jreader = new JReader[Test2] {
-      override def read(v: JVal): JResult[Test2] =
-        ((v \ "id").read[String] and
-          (v \ "num").read[Int] $).lift(Test2.apply)
+  object Subject {
+    implicit def jreader = new JReader[Subject] {
+      override def read(v: JVal): JResult[Subject] =
+        ((v \ "id").read[Int] and
+          (v \ "login").read[String] $).lift(Subject.apply)
 
     }
   }
 
-  case class Test3(x: String, y: Int, z: Boolean) {
-    override def toString: String = "Test(x = " + x + ", y = " + y + ", z = " + z + ")"
+  case class ComplexSubject(id: Int, login: String, trusted: Boolean) {
+    override def toString: String = "ComplexSubject(id = " + id + ", login = " + login + ", trusted = " + trusted + ")"
   }
 
-  object Test3 {
-    implicit def jreader = new JReader[Test3] {
-      override def read(v: JVal): JResult[Test3] =
-        ((v \ "id").read[String] and
-          (v \ "num").read[Int] and
-          (v \ "act").read[Boolean] $).lift(Test3.apply)
+  object ComplexSubject {
+    implicit def jreader = new JReader[ComplexSubject] {
+      override def read(v: JVal): JResult[ComplexSubject] =
+        ((v \ "id").read[Int] and
+          (v \ "login").read[String] and
+          (v \ "trusted").read[Boolean] $).lift(ComplexSubject.apply)
 
     }
   }
 
-  val jTest1 = objTTest.as[Test1]
-  val jTest2 = objTTest.as[Test2]
-  val jTest3 = objTTest.as[Test3]
+  it should "deserialize simple JSON subject " in {
+    sub.as[SimpleSubject] shouldBe SimpleSubject(193)
+  }
 
-  System.out.println(jTest1)
-  System.out.println(jTest2)
-  System.out.println(jTest3)
+  it should "deserialize normal JSON subject " in {
+    sub.as[Subject] shouldBe Subject(193, "jon")
+  }
 
-  val objWoOptTest = Json.obj(
-    "id" -> "new"
+  it should "deserialize complex JSON subject " in {
+    sub.as[ComplexSubject] shouldBe ComplexSubject(193, "jon", true)
+  }
+
+  val usrWoLastName = Json.obj(
+    "first_name" -> "jon"
   )
 
-  val objOptTest = Json.obj(
-    "id" -> "new",
-    "num" -> "My Name"
+  val usr = Json.obj(
+    "first_name" -> "jon",
+    "last_name" -> "smith"
   )
   
-  case class TestOpt(id: String, name: Option[String]) {
-    override def toString: String = "Test(id = " + id + ", name = " + name + ")"
+  case class User(firstName: String, lastName: Option[String]) {
+    override def toString: String = "User(firstName = " + firstName + ", lastName = " + lastName + ")"
   }
 
-  object TestOpt {
-    implicit def jreader = new JReader[TestOpt] {
-      override def read(v: JVal): JResult[TestOpt] =
-        ((v \ "id").read[String] and
-          (v \ "num").read[Option[String]] $).lift(TestOpt.apply)
+  object User {
+    implicit def jreader = new JReader[User] {
+      override def read(v: JVal): JResult[User] =
+        ((v \ "first_name").read[String] and
+          (v \ "last_name").read[Option[String]] $).lift(User.apply)
 
     }
   }
 
-  System.out.println(objWoOptTest.as[TestOpt])
-  System.out.println(objOptTest.as[TestOpt])
+  it should "deserialize JSON user without last name " in {
+    usrWoLastName.as[User] shouldBe User("jon", None)
+  }
 
-
-
-
+  it should "deserialize JSON user " in {
+    usr.as[User] shouldBe User("jon", Some("smith"))
+  }
 
 }
