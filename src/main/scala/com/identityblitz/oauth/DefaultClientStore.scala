@@ -1,6 +1,6 @@
 package com.identityblitz.oauth
 
-import com.identityblitz.utils.json.{JResult, JVal, JReader}
+import com.identityblitz.json.{JResult, JVal, JReader}
 
 import scala.collection.Map
 

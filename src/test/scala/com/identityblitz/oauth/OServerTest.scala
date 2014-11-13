@@ -1,6 +1,6 @@
 package com.identityblitz.oauth
 
-import com.identityblitz.utils.json.{Json, JObj}
+import com.identityblitz.json.{Json, JObj}
 import org.apache.commons.codec.net.URLCodec
 import org.scalatest.{Matchers, FlatSpec}
 

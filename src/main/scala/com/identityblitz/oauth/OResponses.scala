@@ -1,6 +1,6 @@
 package com.identityblitz.oauth
 
-import com.identityblitz.utils.json.{JBool, JWriter, JStr, JObj}
+import com.identityblitz.json.{JBool, JWriter, JStr, JObj}
 import java.net.URI
 import org.apache.commons.codec.net.URLCodec
 

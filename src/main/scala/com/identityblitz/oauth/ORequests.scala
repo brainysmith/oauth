@@ -1,7 +1,7 @@
 package com.identityblitz.oauth
 
 import java.net.{URISyntaxException, URI}
-import com.identityblitz.utils.json.{JVal, Json, JObj}
+import com.identityblitz.json.{JVal, Json, JObj}
 import org.apache.commons.codec.binary.Base64
 
 import scala.annotation.implicitNotFound
