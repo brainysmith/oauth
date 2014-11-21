@@ -211,6 +211,54 @@ trait ORequests {
     def convert(in: Req): AcsTknReq
   }
 
+  /**
+   * Request builders
+   */
+
+  def request(rt: responseType): ReqBuilder = ReqBuilder.empty(rt)
+
+  trait ReqBuilder {
+
+    val responseTypes: Set[responseType]
+
+    if(responseTypes == null || responseTypes.isEmpty)
+      throw new IllegalArgumentException("Response types must be defined")
+
+    val client: Option[Client]
+    val redirectUri: Option[URI]
+    val scopes: Set[String]
+
+    def and(rt: responseType): ReqBuilder = ReqBuilder.apply(responseTypes + rt)(this)
+
+    def to(clt: Client): ReqBuilder = ReqBuilderImpl(responseTypes, Some(clt), redirectUri, scopes)
+
+    def redirectTo(redirect: URI): ReqBuilder = ReqBuilderImpl(responseTypes, client, Some(redirect), scopes)
+
+    def withScope(scp: String): ReqBuilder = ReqBuilderImpl(responseTypes, client, redirectUri, scopes + scp)
+
+    def withScopes(scp: Set[String]): ReqBuilder = ReqBuilderImpl(responseTypes, client, redirectUri, scopes ++ scp)
+
+    def send = ???
+
+  }
+
+  private case class ReqBuilderImpl(responseTypes: Set[responseType],
+                                    client: Option[Client] = None,
+                                    redirectUri: Option[URI] = None,
+                                    scopes: Set[String] = Set()) extends ReqBuilder
+
+  object ReqBuilder {
+    def apply(rts: Set[responseType])(rb: ReqBuilder): ReqBuilder = ReqBuilderImpl(rts, rb.client, rb.redirectUri, rb.scopes)
+    def empty(rt: responseType): ReqBuilder = new ReqBuilderImpl(Set(rt))
+  }
+
+
+  sealed class responseType(val name: String)
+
+  object code extends responseType("code")
+
+  object token extends responseType("token")
+
 
 
 }
