@@ -15,6 +15,13 @@ trait ClientStore extends ORequests {
     */
     def authenticate(req: OReq): Either[OAuthException, Client]
 
+    /**
+     * Builds client secret for the specified request.
+     * @param req - request to build client secret for
+     * @return - built client secret
+     */
+    def buildClientSecret(req: OReq): Option[String]
+
   }
 
   def byClientId(id: String): Option[Client]

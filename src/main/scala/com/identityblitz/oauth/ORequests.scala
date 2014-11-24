@@ -3,6 +3,7 @@ package com.identityblitz.oauth
 import java.net.{URISyntaxException, URI}
 import com.identityblitz.json.{JVal, Json, JObj}
 import org.apache.commons.codec.binary.Base64
+import org.apache.commons.codec.net.URLCodec
 
 import scala.annotation.implicitNotFound
 import scala.util.Try
@@ -13,6 +14,8 @@ trait ORequests {
   trait OReq {
 
     def param(name: String): Option[String]
+
+    def names: Set[String]
 
   }
 
@@ -46,7 +49,7 @@ trait ORequests {
       .map(id => byClientId(id).getOrElse(throw new OAuthException("invalid_client", "Unknown client " + id + ".", state)))
       .getOrElse(throw new OAuthException("invalid_client", "Undefined client.", state))
 
-    clientId.authenticate(this) match {
+    def authenticate = clientId.authenticate(this) match {
       case Right(_) =>
       case Left(e) => throw e
     }
@@ -79,7 +82,12 @@ trait ORequests {
     */
     protected def extResponseTypes: Set[String] = Set()
 
-    final def serialize: String = Base64.encodeBase64URLSafeString(iSerialize.toJson.getBytes("UTF-8"))
+    final def serialize: String = Base64.encodeBase64URLSafeString(clientId.buildClientSecret(this)
+      .fold(iSerialize)(cs => iSerialize + ("client_secret" -> cs)).toJson.getBytes("UTF-8"))
+
+    final def asQueryString = "?" +
+      names.map(n => n + "=" + new URLCodec("US-ASCII").encode(param(n).getOrElse(""))).mkString("&") +
+      clientId.buildClientSecret(this).fold("")("client_secret=" + new URLCodec("US-ASCII").encode(_))
 
     /**
      * Serializes this request to [[JObj]]. Intended to be overridden by the implementation.
@@ -186,6 +194,8 @@ trait ORequests {
       case "exception" => Some(exception.toString) //hack
     }
 
+    def names = Set("authz_req", "succeeded", "exception")
+
   }
 
   /**
@@ -196,6 +206,7 @@ trait ORequests {
   trait ZReqConverter[Req] {
     def convert(in: Req): AuthzReq
     def convert(in: JObj): AuthzReq
+    def convert(in: AuthzReqBuilder): AuthzReq
 
     /**
      * Deserializes an authorization request from string representation obtained from call to
@@ -215,49 +226,68 @@ trait ORequests {
    * Request builders
    */
 
-  def request(rt: responseType): ReqBuilder = ReqBuilder.empty(rt)
+  def request(rt: responseType): AuthzReqBuilder = AuthzReqBuilder.empty(rt)
 
-  trait ReqBuilder {
-
-    val responseTypes: Set[responseType]
-
-    if(responseTypes == null || responseTypes.isEmpty)
-      throw new IllegalArgumentException("Response types must be defined")
-
-    val client: Option[Client]
-    val redirectUri: Option[URI]
-    val scopes: Set[String]
-
-    def and(rt: responseType): ReqBuilder = ReqBuilder.apply(responseTypes + rt)(this)
-
-    def to(clt: Client): ReqBuilder = ReqBuilderImpl(responseTypes, Some(clt), redirectUri, scopes)
-
-    def redirectTo(redirect: URI): ReqBuilder = ReqBuilderImpl(responseTypes, client, Some(redirect), scopes)
-
-    def withScope(scp: String): ReqBuilder = ReqBuilderImpl(responseTypes, client, redirectUri, scopes + scp)
-
-    def withScopes(scp: Set[String]): ReqBuilder = ReqBuilderImpl(responseTypes, client, redirectUri, scopes ++ scp)
-
-    def send = ???
-
-  }
-
-  private case class ReqBuilderImpl(responseTypes: Set[responseType],
-                                    client: Option[Client] = None,
-                                    redirectUri: Option[URI] = None,
-                                    scopes: Set[String] = Set()) extends ReqBuilder
-
-  object ReqBuilder {
-    def apply(rts: Set[responseType])(rb: ReqBuilder): ReqBuilder = ReqBuilderImpl(rts, rb.client, rb.redirectUri, rb.scopes)
-    def empty(rt: responseType): ReqBuilder = new ReqBuilderImpl(Set(rt))
-  }
-
+  /**
+   * Response types
+   */
 
   sealed class responseType(val name: String)
 
   object code extends responseType("code")
 
   object token extends responseType("token")
+
+  trait Sender[RQ, RS] {
+    def send(a: AuthzReq)
+  }
+
+
+
+  /**
+   * Authorization request builder
+   */
+
+  trait AuthzReqBuilder {
+
+    val responseTypes: Set[responseType]
+
+    if(responseTypes == null || responseTypes.isEmpty)
+      throw new IllegalArgumentException("Response types must be defined")
+
+    val clientId: Option[String]
+    val redirectUri: Option[URI]
+    val scopes: Set[String]
+    val extParams: Map[String, String]
+
+    def and(rt: responseType): AuthzReqBuilder = AuthzReqBuilder.apply(responseTypes + rt)(this)
+
+    def from(clt: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, Some(clt), redirectUri, scopes, extParams)
+
+    def redirectTo(redirect: URI): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, Some(redirect), scopes, extParams)
+
+    def withScope(scp: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes + scp, extParams)
+
+    def withScopes(scp: Set[String]): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes ++ scp, extParams)
+
+    def withExtParam(name: String, value: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes, extParams + (name -> value))
+
+    def build[Req](implicit c: ZReqConverter[Req]): AuthzReq = c.convert(this)
+
+    def send[Req, Resp](implicit c: ZReqConverter[Req], s: Sender[Req, Resp]) = s.send(c.convert(this))
+
+  }
+
+  private case class AuthzReqBuilderImpl(responseTypes: Set[responseType],
+                                         clientId: Option[String] = None,
+                                         redirectUri: Option[URI] = None,
+                                         scopes: Set[String] = Set(),
+                                         extParams: Map[String, String] = Map()) extends AuthzReqBuilder
+
+  object AuthzReqBuilder {
+    def apply(rts: Set[responseType])(rb: AuthzReqBuilder): AuthzReqBuilder = AuthzReqBuilderImpl(rts, rb.clientId, rb.redirectUri, rb.scopes)
+    def empty(rt: responseType): AuthzReqBuilder = new AuthzReqBuilderImpl(Set(rt))
+  }
 
 
 

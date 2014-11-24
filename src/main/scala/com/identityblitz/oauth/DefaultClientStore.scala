@@ -6,7 +6,7 @@ import scala.collection.Map
 
 trait DefaultClientStore extends ClientStore with OAuthErrors {
 
-  private val store: Map[String, Client] = Map.empty
+  protected val store: Map[String, Client]
 
   override def byClientId(id: String): Option[Client] = store.get(id)
 
@@ -23,11 +23,12 @@ trait DefaultClientStore extends ClientStore with OAuthErrors {
         else Left(new OAuthException("unauthorized_client", "client_id or client_secret is incorrect", None))}
     }
 
-    /*implicit def jreader = new JReader[DefaultClient] {
-      override def read(v: JVal): JResult[DefaultClient] = {
-        (v \ "id").as[String]
-      }
-    }*/
+    /**
+     * Builds client secret for the specified request.
+     * @param req - request to build client secret for
+     * @return - built client secret
+     */
+    override def buildClientSecret(req: OReq): Option[String] = Option(clientSecret)
 
   }
 

@@ -145,6 +145,8 @@ trait OResponses extends ORequests with ClientStore {
       )(jmp("error_uri")(_, _))
     )(jmp("state")(_, _))
 
+    def asException = OAuthException(this.error, this.errorDescription, this.errorUri, this.state)
+
   }
 
   object ErrorResp {
@@ -170,6 +172,11 @@ trait OResponses extends ORequests with ClientStore {
         case _ => None
       }
     }
+
+    def apply(params: Map[String, String]) = new ErrorResp {
+      override def param(name: String): Option[String] = params.get(name)
+    }
+
   }
 
   private def mp(n: String)(a: String, b: String): String = a + "&" + n + "=" + uc.encode(b)
@@ -209,6 +216,11 @@ trait OResponses extends ORequests with ClientStore {
   @implicitNotFound("No OAuth 2.0 response converter found for type ${Resp}. Try to implement an implicit RespConverter.")
   trait RespConverter[Resp] {
     def convert(res: OResp): Resp
+  }
+
+  @implicitNotFound("No OAuth 2.0 authorization response converter found for type ${Req}. Try to implement an implicit ZRespConverter.")
+  trait ZRespConverter[Req] {
+    def convert(res: Req): OResp
   }
 
 }
