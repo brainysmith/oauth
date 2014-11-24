@@ -226,7 +226,7 @@ trait ORequests {
    * Request builders
    */
 
-  def request(rt: responseType): AuthzReqBuilder = AuthzReqBuilder.empty(rt)
+  def oRequest(rt: responseType): AuthzReqBuilder = AuthzReqBuilder.empty(rt)
 
   /**
    * Response types
@@ -239,7 +239,7 @@ trait ORequests {
   object token extends responseType("token")
 
   trait Sender[RQ, RS] {
-    def send(a: AuthzReq)
+    def send(a: AuthzReq): RS
   }
 
 

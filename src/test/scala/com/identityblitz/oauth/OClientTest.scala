@@ -55,8 +55,8 @@ class OClientTest extends FlatSpec with Matchers {
     )
 
     override implicit val sender: Sender[StringWrapper, String] = new Sender[StringWrapper, String] {
-      override def send(a: AuthzReq): Unit = {
-        System.out.println(a.asQueryString)
+      override def send(a: AuthzReq): String = {
+        a.asQueryString
       }
     }
 
@@ -68,7 +68,7 @@ class OClientTest extends FlatSpec with Matchers {
     import TestOClient._
     import scala.language.postfixOps
 
-    request(code) from "esia" redirectTo new URI("home") withScope "usr_inf" withExtParam("time", new Date().toString) send
+    System.out.println(request(code) from "esia" redirectTo new URI("home") withScope "usr_inf" withExtParam("time", new Date().toString) send)
 
 
     System.out.println(callback(StringWrapper("?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz")))
