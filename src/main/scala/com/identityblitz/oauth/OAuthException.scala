@@ -13,6 +13,10 @@ case class OAuthException(error: String,
 
 }
 
+object OAuthException {
+  def apply(error: String, errorDescription: String, state: Option[String] = None) = new OAuthException(error, errorDescription, state)
+}
+
 trait OAuthErrors extends OResponses {
 
   val invalid_request = error("invalid_request", """The request is missing a required parameter, includes

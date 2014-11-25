@@ -87,7 +87,7 @@ trait ORequests {
 
     final def asQueryString = "?" +
       names.map(n => n + "=" + new URLCodec("US-ASCII").encode(param(n).getOrElse(""))).mkString("&") +
-      clientId.buildClientSecret(this).fold("")("client_secret=" + new URLCodec("US-ASCII").encode(_))
+      clientId.buildClientSecret(this).fold("")("&client_secret=" + new URLCodec("US-ASCII").encode(_))
 
     /**
      * Serializes this request to [[JObj]]. Intended to be overridden by the implementation.
@@ -258,19 +258,22 @@ trait ORequests {
     val clientId: Option[String]
     val redirectUri: Option[URI]
     val scopes: Set[String]
+    val state: Option[String]
     val extParams: Map[String, String]
 
     def and(rt: responseType): AuthzReqBuilder = AuthzReqBuilder.apply(responseTypes + rt)(this)
 
-    def from(clt: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, Some(clt), redirectUri, scopes, extParams)
+    def from(clt: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, Some(clt), redirectUri, scopes, state, extParams)
 
-    def redirectTo(redirect: URI): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, Some(redirect), scopes, extParams)
+    def redirectTo(redirect: URI): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, Some(redirect), scopes, state, extParams)
 
-    def withScope(scp: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes + scp, extParams)
+    def withScope(scp: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes + scp, state, extParams)
 
-    def withScopes(scp: Set[String]): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes ++ scp, extParams)
+    def withScopes(scp: Set[String]): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes ++ scp, state, extParams)
 
-    def withExtParam(name: String, value: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes, extParams + (name -> value))
+    def withState(st: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes, Some(st), extParams)
+
+    def withExtParam(name: String, value: String): AuthzReqBuilder = AuthzReqBuilderImpl(responseTypes, clientId, redirectUri, scopes, state, extParams + (name -> value))
 
     def build[Req](implicit c: ZReqConverter[Req]): AuthzReq = c.convert(this)
 
@@ -282,10 +285,11 @@ trait ORequests {
                                          clientId: Option[String] = None,
                                          redirectUri: Option[URI] = None,
                                          scopes: Set[String] = Set(),
+                                         state: Option[String] = None,
                                          extParams: Map[String, String] = Map()) extends AuthzReqBuilder
 
   object AuthzReqBuilder {
-    def apply(rts: Set[responseType])(rb: AuthzReqBuilder): AuthzReqBuilder = AuthzReqBuilderImpl(rts, rb.clientId, rb.redirectUri, rb.scopes)
+    def apply(rts: Set[responseType])(rb: AuthzReqBuilder): AuthzReqBuilder = AuthzReqBuilderImpl(rts, rb.clientId, rb.redirectUri, rb.scopes, rb.state, rb.extParams)
     def empty(rt: responseType): AuthzReqBuilder = new AuthzReqBuilderImpl(Set(rt))
   }
 
