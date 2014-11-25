@@ -109,10 +109,14 @@ trait ORequests {
     val clientId: Client = param("client_id").flatMap(byClientId)
       .getOrElse(throw new OAuthException("invalid_client", "Unknown client"))
 
-    clientId.authenticate(this) match {
+    def authenticate = clientId.authenticate(this) match {
       case Right(_) =>
       case Left(e) => throw e
     }
+
+    def asJson: JObj = names.foldRight(JObj())((a, b) => b + (a -> param(a)))
+
+    def asQueryString = "?" + names.map(n => n + "=" + new URLCodec("US-ASCII").encode(param(n).getOrElse(""))).mkString("&")
 
   }
 
@@ -220,6 +224,7 @@ trait ORequests {
   @implicitNotFound("No access request converter found for type ${Req}. Try to implement an implicit AReqConverter.")
   trait AReqConverter[Req] {
     def convert(in: Req): AcsTknReq
+    def convert(in: AccessReqBuilder[_]): AcsTknReq
   }
 
   /**
@@ -240,6 +245,7 @@ trait ORequests {
 
   trait Sender[RQ, RS] {
     def send(a: AuthzReq): RS
+    def send(a: AcsTknReq): RS
   }
 
 
@@ -294,5 +300,58 @@ trait ORequests {
   }
 
 
+
+  def aRequest(rt: authorization_code) = new {
+    def withCode(code: String) = CodeReqBuilder(rt, code)
+  }
+
+  /**
+   * Grant types
+   */
+
+  sealed class grantType(val name: String)
+
+  sealed class authorization_code extends grantType("authorization_code")
+  object authorization_code extends authorization_code
+
+  /**
+   * Access request builder
+   */
+
+  trait AccessReqBuilder[B <: AccessReqBuilder[B]] {
+
+    val grant: grantType
+
+    if(grant == null)
+      throw new IllegalArgumentException("Grant types must be defined")
+
+    val clientId: Option[String]
+    val extParams: Map[String, String]
+
+    def from(clt: String): B
+
+    def withExtParam(name: String, value: String): B
+
+    def build[Req](implicit c: AReqConverter[Req]): AcsTknReq = c.convert(this)
+
+    def send[Req, Resp](implicit c: AReqConverter[Req], s: Sender[Req, Resp]) = s.send(c.convert(this))
+
+  }
+
+  case class CodeReqBuilder(grant: grantType,
+                            code: String,
+                            clientId: Option[String] = None,
+                            redirectUri: Option[URI] = None,
+                            extParams: Map[String, String] = Map()) extends AccessReqBuilder[CodeReqBuilder] {
+    if(code == null)
+      throw new IllegalArgumentException("Code must be defined")
+
+    override def from(clt: String) = CodeReqBuilder(grant, code, Some(clt), redirectUri, extParams)
+
+    override def withExtParam(name: String, value: String): CodeReqBuilder = CodeReqBuilder(grant, code, clientId, redirectUri, extParams + (name -> value))
+
+    def redirectTo(redirect: URI): CodeReqBuilder = CodeReqBuilder(grant, code, clientId, Some(redirect), extParams)
+
+  }
 
 }
