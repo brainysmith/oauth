@@ -72,9 +72,12 @@ class OClientTest extends FlatSpec with Matchers {
       "esia" -> DefaultClient("esia", "super secret", "ESIA")
     )
 
-    override implicit val sender: Sender[StringWrapper, String] = new Sender[StringWrapper, String] {
+    override implicit val zSender: ZSender[String] = new ZSender[String] {
       override def send(a: AuthzReq): String = a.asQueryString
-      override def send(a: AcsTknReq): String = a.asJson.toJson
+    }
+
+    implicit val aSender: ASender[String] = new ASender[String] {
+      override def send(a: AcsTknReq): String = a.asQueryString
     }
 
   }

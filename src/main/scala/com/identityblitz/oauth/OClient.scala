@@ -4,7 +4,7 @@ import scala.util.{Failure, Success, Try}
 
 trait OClient[Req, Resp] extends OAuthErrors {
 
-  implicit val sender: Sender[Req, Resp]
+  implicit val zSender: ZSender[Resp]
 
   final def callback(res: Req)(implicit c: ZRespConverter[Req]): Either[OAuthException, AuthzResp] = {
     Try(c.convert(res)) match {

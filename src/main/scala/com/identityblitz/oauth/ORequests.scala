@@ -118,6 +118,8 @@ trait ORequests {
 
     def asQueryString = "?" + names.map(n => n + "=" + new URLCodec("US-ASCII").encode(param(n).getOrElse(""))).mkString("&")
 
+    def asMap = names.map(n => (n, Seq(param(n).get))).toMap
+
   }
 
   /**
@@ -243,9 +245,8 @@ trait ORequests {
 
   object token extends responseType("token")
 
-  trait Sender[RQ, RS] {
+  trait ZSender[RS] {
     def send(a: AuthzReq): RS
-    def send(a: AcsTknReq): RS
   }
 
 
@@ -283,7 +284,7 @@ trait ORequests {
 
     def build[Req](implicit c: ZReqConverter[Req]): AuthzReq = c.convert(this)
 
-    def send[Req, Resp](implicit c: ZReqConverter[Req], s: Sender[Req, Resp]) = s.send(c.convert(this))
+    def send[Req, Resp](implicit c: ZReqConverter[Req], s: ZSender[Resp]) = s.send(c.convert(this))
 
   }
 
@@ -305,6 +306,8 @@ trait ORequests {
     def withCode(code: String) = CodeReqBuilder(rt, code)
   }
 
+
+
   /**
    * Grant types
    */
@@ -313,6 +316,12 @@ trait ORequests {
 
   sealed class authorization_code extends grantType("authorization_code")
   object authorization_code extends authorization_code
+
+  trait ASender[RS] {
+    def send(a: AcsTknReq): RS
+  }
+
+
 
   /**
    * Access request builder
@@ -334,7 +343,7 @@ trait ORequests {
 
     def build[Req](implicit c: AReqConverter[Req]): AcsTknReq = c.convert(this)
 
-    def send[Req, Resp](implicit c: AReqConverter[Req], s: Sender[Req, Resp]) = s.send(c.convert(this))
+    def send[Req, Resp](implicit c: AReqConverter[Req], s: ASender[Resp]) = s.send(c.convert(this))
 
   }
 
