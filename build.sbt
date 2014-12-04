@@ -21,6 +21,19 @@ resolvers += "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m
 
 resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
 
+val nexus = "http://build.reaxoft.loc/store/content/repositories/"
+
+credentials += Credentials("Sonatype Nexus Repository Manager", "build.reaxoft.loc", "deployment", "oracle_1")
+
+publishTo <<= version { (v: String) =>
+  val nexus = "http://build.reaxoft.loc/store/content/repositories"
+  //val nexus = "https://oss.sonatype.org/"
+  if (v.trim.endsWith("SNAPSHOT"))
+    Some("snapshots" at nexus + "/blitz-dev")
+  else
+    Some("releases"  at nexus + "/blitz-dev")
+}
+
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.6.6",
   "commons-codec" % "commons-codec" % "1.9",
