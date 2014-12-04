@@ -23,13 +23,11 @@ resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
 
 resolvers += "Reaxoft Nexus" at "http://build.reaxoft.loc/store/content/repositories/blitz-dev"
 
-val nexus = "http://build.reaxoft.loc/store/content/repositories/"
+val nexus = "http://build.reaxoft.loc/store/content/repositories"
 
 credentials += Credentials("Sonatype Nexus Repository Manager", "build.reaxoft.loc", "deployment", "oracle_1")
 
 publishTo <<= version { (v: String) =>
-  val nexus = "http://build.reaxoft.loc/store/content/repositories"
-  //val nexus = "https://oss.sonatype.org/"
   if (v.trim.endsWith("SNAPSHOT"))
     Some("snapshots" at nexus + "/blitz-dev")
   else
