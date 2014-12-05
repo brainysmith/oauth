@@ -21,7 +21,7 @@ resolvers += "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m
 
 resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
 
-resolvers += "Reaxoft Nexus" at "http://build.reaxoft.loc/store/content/repositories/blitz-dev"
+resolvers += "Reaxoft Nexus" at "http://build.reaxoft.loc/store/content/repositories/blitz-snapshots"
 
 val nexus = "http://build.reaxoft.loc/store/content/repositories"
 
@@ -29,9 +29,9 @@ credentials += Credentials("Sonatype Nexus Repository Manager", "build.reaxoft.l
 
 publishTo <<= version { (v: String) =>
   if (v.trim.endsWith("SNAPSHOT"))
-    Some("snapshots" at nexus + "/blitz-dev")
+    Some("snapshots" at nexus + "/blitz-snapshots")
   else
-    Some("releases"  at nexus + "/blitz-dev")
+    Some("releases"  at nexus + "/blitz-releases")
 }
 
 libraryDependencies ++= Seq(
