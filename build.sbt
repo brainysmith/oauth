@@ -2,7 +2,7 @@ name := "oauth"
 
 organization := "com.identityblitz"
 
-version := "0.1.0"
+version := "0.1.0-SNAPSHOT"
 
 licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
 
@@ -42,7 +42,7 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.3",
   "org.joda" % "joda-convert" % "1.6",
   "commons-lang" % "commons-lang" % "2.6",
-  "com.identityblitz" % "json-lib" % "0.1.0",
+  "com.identityblitz" % "json-lib" % "0.1.0-SNAPSHOT",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.48",
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test"
