@@ -2,7 +2,7 @@ name := "oauth"
 
 organization := "com.identityblitz"
 
-version := "0.1.0-SNAPSHOT"
+version := "0.1.0"
 
 licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
 
@@ -32,8 +32,8 @@ publishTo <<= version { (v: String) =>
   if (v.trim.endsWith("SNAPSHOT"))
     Some("snapshots" at reaxoft_local_repository + "/blitz-snapshots")
   else
-    //Some("reaxoft-releases" at reaxoft_local_repository + "/blitz-releases")
-    Some("maven-central" at maven_central + "service/local/staging/deploy/maven2")
+    Some("reaxoft-releases" at reaxoft_local_repository + "/blitz-releases")
+    //Some("maven-central" at maven_central + "service/local/staging/deploy/maven2")
 }
 
 libraryDependencies ++= Seq(
